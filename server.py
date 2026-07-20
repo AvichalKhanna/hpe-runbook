@@ -70,15 +70,27 @@ N_GPU_LAYERS = -1             # -1 = offload every layer to GPU if a CUDA build 
 MAX_NEW_TOKENS = 512
 
 SYSTEM_PROMPT = (
-    "You are an on-call operations assistant. You answer ONLY using the runbook "
-    "excerpts provided below, which are labeled [Source 1], [Source 2], etc. "
+    "You are an Enterprise AI Incident Copilot. You answer ONLY using the runbook "
+    "excerpts provided below, labeled [Source 1], [Source 2], etc. "
     "Rules:\n"
     "1. Every factual claim or remediation step must include the matching "
     "[Source N] citation right after it.\n"
     "2. If the excerpts do not contain enough information to answer, say so "
     "plainly and suggest escalating -- never invent steps, commands, thresholds, "
     "or contacts that are not in the excerpts.\n"
-    "3. Be concise and use numbered steps for remediation procedures.\n"
+    "3. Respond in the following structured format:\n"
+    "### Incident\n"
+    "Description of the incident.\n"
+    "### Likely Cause\n"
+    "Root cause analysis.\n"
+    "### Recommended Actions\n"
+    "Numbered steps to remediate the issue.\n"
+    "### Verification Checklist\n"
+    "Interactive checklist items to verify resolution.\n"
+    "### Escalation Decision\n"
+    "When and how to escalate.\n"
+    "### Resolution Summary\n"
+    "Brief summary of the solution.\n"
 )
 
 
@@ -135,10 +147,67 @@ class RetrievalState:
     bm25 = None
     chunks: List[dict] = []
     llm = None
+    conversation_memory: dict = {}
 
 
 state = RetrievalState()
-app = FastAPI(title="Runbook RAG Chatbot")
+app = FastAPI(title="Enterprise AI Incident Copilot")
+
+# Multi-cloud tag keywords for automatic tagging
+TAG_KEYWORDS = {
+    "AWS": ["aws", "rds", "s3", "ec2", "lambda", "cloudfront", "route53", "iam"],
+    "Azure": ["azure", "blob", "virtual machine", "app service", "aks", "cosmos db"],
+    "GCP": ["gcp", "google cloud", "gce", "gke", "cloud storage", "bigquery"],
+    "Kubernetes": ["kubernetes", "k8s", "pod", "deployment", "service", "namespace", "helm"],
+    "Linux": ["linux", "unix", "bash", "ssh", "systemd", "syslog"],
+    "Networking": ["network", "dns", "tcp", "udp", "firewall", "load balancer", "latency"],
+    "Database": ["database", "postgres", "mysql", "sql", "mongodb", "redis", "connection pool"]
+}
+
+def classify_severity(query: str, sources: List[dict], top1_cosine: float) -> str:
+    p1_keywords = ["critical", "down", "outage", "hard down", "production down", "site down", "complete outage"]
+    p2_keywords = ["high", "severe", "major", "impacted", "degraded", "slow", "unavailable"]
+    p3_keywords = ["medium", "moderate", "warning", "minor issue"]
+    
+    lower_query = query.lower()
+    
+    for kw in p1_keywords:
+        if kw in lower_query:
+            return "P1"
+    for kw in p2_keywords:
+        if kw in lower_query:
+            return "P2"
+    for kw in p3_keywords:
+        if kw in lower_query:
+            return "P3"
+            
+    if top1_cosine < 0.4:
+        return "P4"
+    elif top1_cosine < 0.6:
+        return "P3"
+    elif top1_cosine < 0.8:
+        return "P2"
+    else:
+        return "P1"
+
+def extract_tags(texts: List[str]) -> List[str]:
+    tags = []
+    lower_text = " ".join(texts).lower()
+    for tag, keywords in TAG_KEYWORDS.items():
+        for kw in keywords:
+            if kw in lower_text:
+                tags.append(tag)
+                break
+    return tags
+
+def get_confidence_label(score: float) -> str:
+    if score >= 0.8:
+        return "High"
+    elif score >= 0.5:
+        return "Medium"
+    else:
+        return "Low"
+
 
 
 def tokenize(text: str) -> list[str]:
@@ -318,23 +387,62 @@ def query(req: QueryRequest):
         t0 = time.time()
         sources, top1_cosine = hybrid_retrieve(q)
         retrieval_ms = int((time.time() - t0) * 1000)
+        
+        # Compute severity, confidence label, tags
+        severity = classify_severity(q, sources, top1_cosine) if sources else "P4"
+        confidence_label = get_confidence_label(top1_cosine)
+        tags = extract_tags([q] + [s['text'] for s in sources])
+        
+        # Compute retrieval analytics
+        dense_matches = sum(1 for s in sources if s['matched_dense'])
+        sparse_matches = sum(1 for s in sources if s['matched_sparse'])
+        
+        # Generate recommended next questions
+        next_questions = [
+            f"Check active connections for {tags[0] if tags else 'system'}",
+            f"View tuning recommendations",
+            f"Verify service status"
+        ]
 
         if not sources or top1_cosine < CONFIDENCE_THRESHOLD:
             payload = {
                 "type": "no_match",
-                "message": (
-                    "No runbook in the index matches this issue with enough "
-                    "confidence to answer safely. Recommend escalating to the "
-                    "on-call lead or checking the internal wiki for undocumented "
-                    "procedures."
-                ),
+                "message": "No confident runbook found.",
+                "possible_reasons": [
+                    "Missing documentation",
+                    "Different incident",
+                    "Unknown error"
+                ],
+                "recommended_actions": [
+                    "Escalate to on-call lead",
+                    "Search internal wiki manually",
+                    "Upload new runbook"
+                ],
                 "top1_cosine": round(top1_cosine, 3),
+                "confidence_label": confidence_label,
                 "retrieval_ms": retrieval_ms,
+                "severity": severity,
+                "tags": tags
             }
             yield f"data: {json.dumps(payload)}\n\n"
             return
 
-        yield f"data: {json.dumps({'type': 'sources', 'sources': sources, 'retrieval_ms': retrieval_ms})}\n\n"
+        yield f"data: {json.dumps({
+            'type': 'sources', 
+            'sources': sources, 
+            'retrieval_ms': retrieval_ms,
+            'severity': severity,
+            'top1_cosine': round(top1_cosine, 3),
+            'confidence_label': confidence_label,
+            'tags': tags,
+            'next_questions': next_questions,
+            'retrieval_analytics': {
+                'chunks_retrieved': len(sources),
+                'dense_matches': dense_matches,
+                'sparse_matches': sparse_matches,
+                'hybrid_score_avg': sum(s['fused_score'] for s in sources) / len(sources) if sources else 0
+            }
+        })}\n\n"
 
         prompt = build_prompt(q, sources)
         t1 = time.time()

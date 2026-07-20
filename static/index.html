@@ -3,20 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Runbook Console · On-Call RAG Assistant</title>
+<title>Enterprise AI Incident Copilot</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg-void: #0A0D12;
-    --bg-panel: #10141C;
-    --bg-raised: #161B25;
-    --border: #232A38;
+    --bg-panel: rgba(16, 20, 28, 0.85);
+    --bg-panel-solid: #10141C;
+    --bg-raised: rgba(22, 27, 37, 0.9);
+    --border: rgba(35, 42, 56, 0.8);
     --text-primary: #E8EBF2;
     --text-muted: #7A8399;
     --accent-signal: #FFB020;
     --accent-cyan: #3FD6C4;
     --accent-danger: #F0546B;
+    --accent-success: #4ADE80;
+    --glass-blur: 12px;
     --mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
     --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   }
@@ -26,8 +29,8 @@
   body{
     margin:0;
     background:
-      radial-gradient(circle at 15% -10%, rgba(63,214,196,0.06), transparent 40%),
-      radial-gradient(circle at 100% 0%, rgba(255,176,32,0.05), transparent 35%),
+      radial-gradient(circle at 15% -10%, rgba(63,214,196,0.1), transparent 40%),
+      radial-gradient(circle at 100% 0%, rgba(255,176,32,0.08), transparent 35%),
       var(--bg-void);
     color:var(--text-primary);
     font-family:var(--sans);
@@ -35,19 +38,20 @@
     flex-direction:column;
     height:100vh;
     overflow:hidden;
+    backdrop-filter: blur(0px);
   }
 
   @media (prefers-reduced-motion: reduce){
     *{animation:none !important; transition:none !important;}
   }
 
-  /* ---------- Status ticker (signature element) ---------- */
+  /* Status ticker with glassmorphism */
   .ticker{
     display:flex;
     align-items:center;
     gap:22px;
     padding:12px 22px;
-    background:var(--bg-panel);
+    background: var(--bg-panel);
     border-bottom:1px solid var(--border);
     font-family:var(--mono);
     font-size:12px;
@@ -55,6 +59,7 @@
     flex-shrink:0;
     flex-wrap:wrap;
     row-gap:6px;
+    backdrop-filter: blur(var(--glass-blur));
   }
   .ticker .brand{
     display:flex;
@@ -83,14 +88,14 @@
   .ticker .stat b{color:var(--text-primary); font-weight:600;}
   .ticker .stat.cyan b{color:var(--accent-cyan);}
 
-  /* ---------- Transcript ---------- */
+  /* Transcript area */
   .transcript{
     flex:1;
     overflow-y:auto;
     padding:28px 0 12px;
   }
   .transcript-inner{
-    max-width:760px;
+    max-width:900px;
     margin:0 auto;
     padding:0 22px;
   }
@@ -102,9 +107,13 @@
     padding:0 20px;
   }
   .empty-state h1{
-    font-size:26px;
+    font-size:28px;
     margin:0 0 10px;
     font-weight:700;
+    background: linear-gradient(90deg, var(--accent-cyan), var(--accent-signal));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
   .empty-state p{
     color:var(--text-muted);
@@ -124,17 +133,18 @@
     color:var(--text-primary);
     background:var(--bg-panel);
     border:1px solid var(--border);
-    padding:9px 14px;
-    border-radius:8px;
+    padding:10px 16px;
+    border-radius:10px;
     cursor:pointer;
-    transition:border-color .15s, background .15s, transform .1s;
+    transition:border-color .15s, background .15s, transform .1s, box-shadow .15s;
+    backdrop-filter: blur(var(--glass-blur));
   }
-  .chip:hover{border-color:var(--accent-cyan); background:var(--bg-raised);}
+  .chip:hover{border-color:var(--accent-cyan); background:var(--bg-raised); box-shadow: 0 4px 12px rgba(63,214,196,0.15);}
   .chip:active{transform:scale(0.97);}
 
   .msg{
     display:flex;
-    margin-bottom:22px;
+    margin-bottom:26px;
     animation:rise .25s ease;
   }
   @keyframes rise{
@@ -143,25 +153,27 @@
   }
   .msg.user{justify-content:flex-end;}
   .msg-bubble{
-    max-width:82%;
+    max-width:100%;
   }
   .msg.user .msg-bubble{
     background:var(--bg-raised);
     border:1px solid var(--border);
     border-radius:12px 12px 2px 12px;
-    padding:11px 15px;
+    padding:12px 16px;
     font-size:14.5px;
     line-height:1.55;
+    backdrop-filter: blur(var(--glass-blur));
   }
   .msg.assistant .msg-bubble{width:100%;}
   .msg-meta{
     font-family:var(--mono);
     font-size:10.5px;
     color:var(--text-muted);
-    margin-bottom:5px;
+    margin-bottom:8px;
     display:flex;
-    gap:8px;
+    gap:10px;
     align-items:center;
+    flex-wrap:wrap;
   }
   .msg.user .msg-meta{justify-content:flex-end;}
   .role-tag{
@@ -171,10 +183,79 @@
   .role-tag.assistant{color:var(--accent-cyan);}
   .role-tag.user{color:var(--text-muted);}
 
+  /* Severity badge */
+  .severity-badge{
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:6px;
+    letter-spacing:0.3px;
+  }
+  .severity-P1{background: rgba(240,84,107,0.2); color: var(--accent-danger); border:1px solid rgba(240,84,107,0.5);}
+  .severity-P2{background: rgba(255,176,32,0.2); color: var(--accent-signal); border:1px solid rgba(255,176,32,0.5);}
+  .severity-P3{background: rgba(63,214,196,0.2); color: var(--accent-cyan); border:1px solid rgba(63,214,196,0.5);}
+  .severity-P4{background: rgba(122,131,153,0.2); color: var(--text-muted); border:1px solid rgba(122,131,153,0.5);}
+
+  /* Confidence visualization */
+  .confidence-container{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin:10px 0;
+    flex-wrap:wrap;
+  }
+  .confidence-bar{
+    flex:1;
+    min-width:150px;
+    height:8px;
+    background:var(--bg-panel-solid);
+    border-radius:4px;
+    overflow:hidden;
+    border:1px solid var(--border);
+  }
+  .confidence-fill{
+    height:100%;
+    border-radius:4px;
+    transition: width 0.5s ease;
+  }
+  .confidence-fill.High{background: linear-gradient(90deg, var(--accent-success), var(--accent-cyan));}
+  .confidence-fill.Medium{background: linear-gradient(90deg, var(--accent-signal), #FACC15);}
+  .confidence-fill.Low{background: linear-gradient(90deg, var(--accent-danger), #FB7185);}
+  .confidence-text{
+    font-family:var(--mono);
+    font-size:11px;
+  }
+  .confidence-label{
+    font-weight:700;
+    font-size:11px;
+  }
+  .confidence-label.High{color:var(--accent-success);}
+  .confidence-label.Medium{color:var(--accent-signal);}
+  .confidence-label.Low{color:var(--accent-danger);}
+
+  /* Tag badges */
+  .tags-container{
+    display:flex;
+    flex-wrap:wrap;
+    gap:6px;
+    margin:10px 0;
+  }
+  .tag-badge{
+    font-family:var(--mono);
+    font-size:10px;
+    padding:3px 8px;
+    border-radius:6px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    color:var(--text-muted);
+  }
+
+  /* Assistant text */
   .assistant-text{
     font-size:14.5px;
     line-height:1.68;
-    padding:2px 0 4px;
+    padding:4px 0 8px;
   }
   .assistant-text b{color:var(--text-primary);}
   .assistant-text code{
@@ -185,49 +266,29 @@
     border-radius:4px;
     font-size:13px;
   }
-
-  /* ---------- Markdown block elements ---------- */
-  .assistant-text p{
-    margin:0 0 12px;
-  }
-  .assistant-text p:last-child{
-    margin-bottom:0;
-  }
-  .assistant-text h3,
-  .assistant-text h4,
-  .assistant-text h5,
-  .assistant-text h6{
+  .assistant-text h3, .assistant-text h4, .assistant-text h5, .assistant-text h6 {
     font-family:var(--sans);
     color:var(--text-primary);
     font-weight:700;
     line-height:1.35;
-    margin:18px 0 8px;
+    margin:16px 0 8px;
   }
-  .assistant-text > *:first-child{
-    margin-top:0;
+  .assistant-text h4 { color: var(--accent-cyan); font-size: 16px; }
+  .assistant-text h5 { 
+    font-size: 13px; 
+    text-transform: uppercase; 
+    letter-spacing: 0.4px; 
+    color: var(--text-muted); 
   }
-  .assistant-text h3{font-size:17px;}
-  .assistant-text h4{font-size:15.5px; color:var(--accent-cyan);}
-  .assistant-text h5{
-    font-size:13px;
-    text-transform:uppercase;
-    letter-spacing:0.4px;
-    color:var(--text-muted);
-  }
-  .assistant-text h6{font-size:13px;}
-  .assistant-text ul,
-  .assistant-text ol{
+  .assistant-text ul, .assistant-text ol {
     margin:0 0 12px;
     padding-left:22px;
   }
-  .assistant-text li{
+  .assistant-text li {
     margin-bottom:6px;
     line-height:1.6;
   }
-  .assistant-text li:last-child{
-    margin-bottom:0;
-  }
-  .assistant-text pre{
+  .assistant-text pre {
     background:var(--bg-panel);
     border:1px solid var(--border);
     border-radius:8px;
@@ -235,7 +296,7 @@
     margin:0 0 12px;
     overflow-x:auto;
   }
-  .assistant-text pre code{
+  .assistant-text pre code {
     background:none;
     border:none;
     padding:0;
@@ -269,22 +330,26 @@
   }
   .src-chip:hover{background:rgba(63,214,196,0.2);}
 
-  /* ---------- Citation tickets ---------- */
+  /* Citation cards with ranking */
   .citations{
-    margin-top:12px;
+    margin-top:14px;
     display:flex;
     flex-direction:column;
-    gap:8px;
+    gap:10px;
   }
   .citation-card{
     background:var(--bg-panel);
     border:1px solid var(--border);
     border-left:3px solid var(--accent-cyan);
-    border-radius:8px;
-    padding:10px 13px;
+    border-radius:10px;
+    padding:12px 14px;
     cursor:pointer;
     transition:background .15s, box-shadow .15s;
+    backdrop-filter: blur(var(--glass-blur));
   }
+  .citation-card.primary{border-left-color: var(--accent-signal);}
+  .citation-card.supporting{border-left-color: var(--accent-cyan);}
+  .citation-card.additional{border-left-color: var(--text-muted);}
   .citation-card.flash{box-shadow:0 0 0 2px rgba(63,214,196,0.4);}
   .citation-card:hover{background:var(--bg-raised);}
   .citation-card.sparse-only{border-left-color:var(--accent-signal);}
@@ -294,74 +359,303 @@
     gap:9px;
     font-family:var(--mono);
     font-size:11.5px;
+    flex-wrap:wrap;
   }
+  .cite-rank{
+    font-weight:700;
+    padding:2px 8px;
+    border-radius:6px;
+    font-size:10px;
+  }
+  .cite-rank.primary{background: rgba(255,176,32,0.2); color: var(--accent-signal);}
+  .cite-rank.supporting{background: rgba(63,214,196,0.2); color: var(--accent-cyan);}
+  .cite-rank.additional{background: rgba(122,131,153,0.2); color: var(--text-muted);}
   .cite-id{
     color:var(--bg-void);
     background:var(--accent-cyan);
     font-weight:700;
-    padding:1px 6px;
-    border-radius:4px;
+    padding:2px 8px;
+    border-radius:6px;
     flex-shrink:0;
   }
   .sparse-only .cite-id{background:var(--accent-signal);}
   .cite-path{color:var(--text-primary); font-weight:500;}
   .cite-lines{color:var(--text-muted); margin-left:auto;}
   .cite-badge{
-    font-size:9.5px;
+    font-size:10px;
     color:var(--text-muted);
     border:1px solid var(--border);
-    padding:0 5px;
-    border-radius:3px;
+    padding:2px 8px;
+    border-radius:6px;
   }
   .cite-snippet{
     font-size:12.5px;
     line-height:1.55;
     color:var(--text-muted);
-    margin-top:8px;
-    padding-top:8px;
+    margin-top:10px;
+    padding-top:10px;
     border-top:1px dashed var(--border);
     display:none;
     white-space:pre-wrap;
   }
   .citation-card.open .cite-snippet{display:block;}
 
+  /* No match improved */
   .no-match-card{
     background:rgba(240,84,107,0.08);
     border:1px solid rgba(240,84,107,0.35);
     border-left:3px solid var(--accent-danger);
-    border-radius:8px;
-    padding:12px 14px;
-    font-size:13.5px;
+    border-radius:10px;
+    padding:16px;
+    font-size:14px;
     line-height:1.6;
     color:var(--text-primary);
+    backdrop-filter: blur(var(--glass-blur));
   }
   .no-match-card .tag{
     font-family:var(--mono);
-    font-size:10.5px;
+    font-size:11px;
     font-weight:700;
     color:var(--accent-danger);
     letter-spacing:0.5px;
     display:block;
-    margin-bottom:6px;
+    margin-bottom:8px;
+  }
+  .no-match-section{
+    margin-top:12px;
+  }
+  .no-match-section h5{
+    font-size:12px;
+    margin:0 0 6px;
+    color:var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing:0.3px;
+  }
+  .no-match-section ul{
+    margin:0;
+    padding-left:20px;
+  }
+  .no-match-section li{
+    margin-bottom:4px;
   }
 
   .lat-footer{
     font-family:var(--mono);
     font-size:10px;
     color:var(--text-muted);
-    margin-top:8px;
+    margin-top:10px;
     opacity:0.8;
   }
 
-  /* ---------- Input bar ---------- */
+  /* Next questions */
+  .next-questions{
+    margin-top:14px;
+  }
+  .next-questions h5{
+    font-size:12px;
+    margin:0 0 10px;
+    color:var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing:0.3px;
+  }
+  .next-questions-list{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+  .next-question-chip{
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    padding:10px 14px;
+    border-radius:8px;
+    cursor:pointer;
+    font-size:13.5px;
+    transition: all 0.15s;
+    backdrop-filter: blur(var(--glass-blur));
+  }
+  .next-question-chip:hover{
+    border-color:var(--accent-cyan);
+    background:var(--bg-raised);
+  }
+
+  /* Interactive Checklist */
+  .checklist{
+    margin-top:14px;
+  }
+  .checklist h5{
+    font-size:12px;
+    margin:0 0 10px;
+    color:var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing:0.3px;
+  }
+  .checklist-item{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:10px 14px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    margin-bottom:8px;
+    cursor:pointer;
+    transition: all 0.15s;
+    backdrop-filter: blur(var(--glass-blur));
+  }
+  .checklist-item:hover{background:var(--bg-raised);}
+  .checklist-item.completed{
+    opacity:0.7;
+  }
+  .checklist-item.completed .checklist-text{
+    text-decoration: line-through;
+  }
+  .checklist-checkbox{
+    width:20px;
+    height:20px;
+    border:2px solid var(--border);
+    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    flex-shrink:0;
+  }
+  .checklist-item.completed .checklist-checkbox{
+    background:var(--accent-success);
+    border-color:var(--accent-success);
+  }
+  .checklist-checkmark{
+    color:var(--bg-void);
+    font-size:14px;
+    font-weight:700;
+    display:none;
+  }
+  .checklist-item.completed .checklist-checkmark{
+    display:block;
+  }
+
+  /* Incident Summary */
+  .summary-section{
+    margin-top:14px;
+  }
+  .summary-btn{
+    background:linear-gradient(135deg, var(--accent-cyan), #0EA5E9);
+    color:var(--bg-void);
+    border:none;
+    padding:10px 18px;
+    border-radius:8px;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:12px;
+    cursor:pointer;
+    transition: transform 0.1s, filter 0.15s;
+  }
+  .summary-btn:hover{filter:brightness(1.1);}
+  .summary-btn:active{transform:scale(0.97);}
+  .summary-content{
+    margin-top:10px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:14px;
+    font-size:13.5px;
+    line-height:1.6;
+    display:none;
+  }
+  .summary-content.visible{display:block;}
+  .summary-actions{
+    margin-top:10px;
+    display:flex;
+    gap:8px;
+  }
+  .download-btn{
+    background:var(--bg-raised);
+    color:var(--accent-cyan);
+    border:1px solid var(--accent-cyan);
+    padding:8px 14px;
+    border-radius:6px;
+    font-family:var(--mono);
+    font-size:11px;
+    cursor:pointer;
+    transition: all 0.15s;
+  }
+  .download-btn:hover{background:rgba(63,214,196,0.1);}
+
+  /* Retrieval Analytics */
+  .analytics-toggle{
+    margin-top:10px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    padding:8px 14px;
+    border-radius:6px;
+    font-family:var(--mono);
+    font-size:11px;
+    cursor:pointer;
+    color:var(--text-muted);
+    transition: all 0.15s;
+  }
+  .analytics-toggle:hover{color:var(--text-primary); border-color:var(--text-muted);}
+  .analytics-panel{
+    margin-top:10px;
+    background:var(--bg-panel);
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:12px;
+    display:none;
+    font-family:var(--mono);
+    font-size:11px;
+  }
+  .analytics-panel.visible{display:block;}
+  .analytics-row{
+    display:flex;
+    justify-content:space-between;
+    padding:4px 0;
+    border-bottom:1px dashed var(--border);
+  }
+  .analytics-row:last-child{border-bottom:none;}
+  .analytics-label{color:var(--text-muted);}
+  .analytics-value{color:var(--accent-cyan); font-weight:600;}
+
+  /* Timeline */
+  .timeline{
+    margin-top:14px;
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+  }
+  .timeline-item{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:11px;
+    font-family:var(--mono);
+  }
+  .timeline-dot{
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    background:var(--text-muted);
+  }
+  .timeline-dot.active{
+    background:var(--accent-cyan);
+    box-shadow:0 0 0 3px rgba(63,214,196,0.2);
+  }
+  .timeline-line{
+    width:30px;
+    height:2px;
+    background:var(--border);
+  }
+
+  /* Input bar */
   .input-bar{
     flex-shrink:0;
     border-top:1px solid var(--border);
     background:var(--bg-panel);
     padding:14px 22px 18px;
+    backdrop-filter: blur(var(--glass-blur));
   }
   .input-inner{
-    max-width:760px;
+    max-width:900px;
     margin:0 auto;
     display:flex;
     gap:10px;
@@ -376,7 +670,7 @@
     font-family:var(--sans);
     font-size:14.5px;
     line-height:1.5;
-    padding:12px 14px;
+    padding:12px 16px;
     border-radius:10px;
     outline:none;
     max-height:140px;
@@ -386,14 +680,14 @@
   textarea::placeholder{color:var(--text-muted);}
 
   .send-btn{
-    background:var(--accent-signal);
+    background: linear-gradient(135deg, var(--accent-signal), #F59E0B);
     color:#1A1200;
     border:none;
     font-family:var(--mono);
     font-weight:700;
     font-size:12.5px;
     letter-spacing:0.3px;
-    padding:13px 18px;
+    padding:13px 20px;
     border-radius:10px;
     cursor:pointer;
     transition:transform .1s, filter .15s;
@@ -430,7 +724,7 @@
   }
 
   .hint{
-    max-width:760px;
+    max-width:900px;
     margin:8px auto 0;
     font-family:var(--mono);
     font-size:10.5px;
@@ -444,7 +738,7 @@
 
   @media (max-width: 560px){
     .ticker{font-size:10.5px; gap:12px; padding:10px 14px;}
-    .empty-state h1{font-size:21px;}
+    .empty-state h1{font-size:22px;}
     .msg-bubble{max-width:92%;}
   }
 </style>
@@ -452,7 +746,7 @@
 <body>
 
   <div class="ticker" id="ticker">
-    <div class="brand"><span class="live-dot"></span>ON-CALL RUNBOOK STRATUM AI</div>
+    <div class="brand"><span class="live-dot"></span>ENTERPRISE AI INCIDENT COPILOT</div>
     <span id="stat-files" class="stat">-- files</span>
     <span class="sep">/</span>
     <span id="stat-chunks" class="stat">-- chunks</span>
@@ -464,7 +758,7 @@
     <div class="transcript-inner">
       <div class="empty-state" id="empty-state">
         <h1>What's the incident?</h1>
-        <p>Ask in plain language. Answers are generated only from the runbooks below,<br>with an exact file + section + line citation for every claim.</p>
+        <p>Ask in plain language. Answers are structured with severity, confidence, and citations.</p>
         <div class="chips" id="chips"></div>
       </div>
     </div>
@@ -476,10 +770,10 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
       </button>
       <input type="file" id="file-input" accept=".md,.pdf,.docx" style="display: none;">
-      <textarea id="input" rows="1" placeholder="e.g. what do I do if the database connection pool is exhausted?"></textarea>
+      <textarea id="input" rows="1" placeholder="e.g., database connection pool is exhausted"></textarea>
       <button class="send-btn" id="send-btn">SEND ⏎</button>
     </div>
-    <div class="hint">Enter to send · Shift+Enter for a new line · answers are grounded &amp; cited, not freeform</div>
+    <div class="hint">Enter to send · Shift+Enter for a new line</div>
   </div>
 
 <script>
@@ -488,7 +782,7 @@ const SUGGESTIONS = [
   "disk space is critical on a prod node",
   "CPU utilization is pegged at 100%",
   "a kubernetes pod is stuck crash-looping",
-  "how do I fail over an AWS RDS instance",
+  "how do I fail over an AWS RDS instance"
 ];
 
 const transcript = document.getElementById('transcript');
@@ -499,6 +793,7 @@ const sendBtn = document.getElementById('send-btn');
 const chipsEl = document.getElementById('chips');
 const uploadBtn = document.getElementById('upload-btn');
 const fileInput = document.getElementById('file-input');
+let conversationHistory = [];
 
 uploadBtn.addEventListener('click', () => fileInput.click());
 
@@ -543,10 +838,6 @@ function escapeHtml(s){
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Dependency-free markdown-ish renderer: fenced code blocks, ### headings,
-// **bold**, `code`, numbered lists, bullet lists, and paragraph/line breaks.
-// [Source N] markers are left as plain text so linkifySources() can turn
-// them into chips afterward.
 function formatInline(s){
   s = s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
   s = s.replace(/`([^`]+?)`/g, '<code>$1</code>');
@@ -554,8 +845,6 @@ function formatInline(s){
 }
 
 function formatText(raw){
-  // 1. Pull out fenced code blocks first so their contents are never
-  //    touched by inline/list/heading formatting.
   const blocks = [];
   let stripped = raw.replace(/```(\w*)\n?([\s\S]*?)```/g, (m, lang, code) => {
     const idx = blocks.length;
@@ -566,7 +855,7 @@ function formatText(raw){
   const rawLines = stripped.split('\n');
   const htmlParts = [];
   let listBuffer = [];
-  let listType = null; // 'ul' | 'ol'
+  let listType = null;
   let paraBuffer = [];
 
   function flushList(){
@@ -593,7 +882,6 @@ function formatText(raw){
       continue;
     }
 
-    // Block placeholder (fenced code) — flush everything, emit as-is.
     const blockMatch = trimmed.match(/^\u0000BLOCK(\d+)\u0000$/);
     if(blockMatch){
       flushList();
@@ -602,17 +890,15 @@ function formatText(raw){
       continue;
     }
 
-    // Headings: #### / ### / ## / #
     const headingMatch = trimmed.match(/^(#{1,4})\s+(.*)$/);
     if(headingMatch){
       flushList();
       flushPara();
-      const level = Math.min(headingMatch[1].length + 2, 6); // ## -> h4, ### -> h5, etc
+      const level = Math.min(headingMatch[1].length + 2, 6);
       htmlParts.push(`<h${level}>${formatInline(escapeHtml(headingMatch[2]))}</h${level}>`);
       continue;
     }
 
-    // Numbered list item: "1. text"
     const olMatch = trimmed.match(/^(\d+)[.)]\s+(.*)$/);
     if(olMatch){
       flushPara();
@@ -622,7 +908,6 @@ function formatText(raw){
       continue;
     }
 
-    // Bullet list item: "- text" or "* text"
     const ulMatch = trimmed.match(/^[-*]\s+(.*)$/);
     if(ulMatch){
       flushPara();
@@ -632,7 +917,6 @@ function formatText(raw){
       continue;
     }
 
-    // Otherwise: regular paragraph line.
     flushList();
     paraBuffer.push(formatInline(escapeHtml(line)));
   }
@@ -706,6 +990,7 @@ function addUserMessage(text){
     </div>`;
   transcriptInner.appendChild(div);
   scrollDown();
+  conversationHistory.push({role:'user', content:text});
 }
 
 function scrollDown(){
@@ -722,18 +1007,12 @@ async function sendQuery(){
 
   const msgDiv = document.createElement('div');
   msgDiv.className = 'msg assistant';
-  msgDiv.innerHTML = `
-    <div class="msg-bubble">
-      <div class="msg-meta"><span class="role-tag assistant">ASSISTANT</span><span>${nowStamp()}</span></div>
-      <div class="assistant-text"><span class="cursor"></span></div>
-    </div>`;
   transcriptInner.appendChild(msgDiv);
-  scrollDown();
-  const textEl = msgDiv.querySelector('.assistant-text');
-
+  
   let rawText = '';
   let sources = [];
   let retrievalMs = 0, generationMs = 0;
+  let metadata = {};
 
   try{
     const res = await fetch('/api/query', {
@@ -760,17 +1039,15 @@ async function sendQuery(){
 
         if(payload.type === 'no_match'){
           retrievalMs = payload.retrieval_ms;
-          textEl.innerHTML = `
-            <div class="no-match-card">
-              <span class="tag">NO CONFIDENT MATCH · top similarity ${payload.top1_cosine}</span>
-              ${escapeHtml(payload.message)}
-            </div>`;
+          metadata = payload;
+          msgDiv.innerHTML = renderNoMatch(payload);
         } else if(payload.type === 'sources'){
           sources = payload.sources;
           retrievalMs = payload.retrieval_ms;
+          metadata = payload;
         } else if(payload.type === 'token'){
           rawText += payload.text;
-          textEl.innerHTML = linkifySources(formatText(rawText)) + '<span class="cursor"></span>';
+          msgDiv.innerHTML = renderAssistantMessage(rawText, true, metadata, sources);
           scrollDown();
         } else if(payload.type === 'done'){
           generationMs = payload.generation_ms;
@@ -778,47 +1055,227 @@ async function sendQuery(){
       }
     }
 
-    // finalize: strip cursor, render citation cards
-    if(sources.length){
-      textEl.innerHTML = linkifySources(formatText(rawText));
-      const citeWrap = document.createElement('div');
-      citeWrap.className = 'citations';
-      sources.forEach((s, i) => {
-        const n = i + 1;
-        const sparseOnly = s.matched_sparse && !s.matched_dense;
-        const badge = s.matched_dense && s.matched_sparse ? 'DENSE+BM25'
-                    : s.matched_dense ? 'DENSE' : 'BM25';
-        const card = document.createElement('div');
-        card.className = 'citation-card' + (sparseOnly ? ' sparse-only' : '');
-        card.dataset.id = n;
-        card.dataset.active = '1';
-        card.onclick = () => toggleCitation(card);
-        card.innerHTML = `
+    if(sources.length || metadata.type !== 'no_match'){
+      msgDiv.innerHTML = renderAssistantMessage(rawText, false, metadata, sources, retrievalMs, generationMs);
+    }
+
+  } catch(err){
+    msgDiv.innerHTML = `
+      <div class="msg-bubble">
+        <div class="msg-meta"><span class="role-tag assistant">ASSISTANT</span><span>${nowStamp()}</span></div>
+        <div class="no-match-card">
+          <span class="tag">CONNECTION ERROR</span>
+          Could not reach the backend. Is server.py running? (${escapeHtml(String(err))})
+        </div>
+      </div>`;
+  } finally {
+    sendBtn.disabled = false;
+    scrollDown();
+    conversationHistory.push({role:'assistant', content:rawText, metadata, sources});
+  }
+}
+
+function renderNoMatch(payload){
+  return `
+    <div class="msg-bubble">
+      <div class="msg-meta">
+        <span class="role-tag assistant">ASSISTANT</span>
+        <span>${nowStamp()}</span>
+        <span class="severity-badge severity-${payload.severity}">${payload.severity}</span>
+      </div>
+      <div class="confidence-container">
+        <div class="confidence-bar">
+          <div class="confidence-fill ${payload.confidence_label}" style="width: ${payload.top1_cosine * 100}%"></div>
+        </div>
+        <span class="confidence-label ${payload.confidence_label}">${payload.confidence_label}</span>
+        <span class="confidence-text">(${Math.round(payload.top1_cosine * 100)}%)</span>
+      </div>
+      <div class="tags-container">
+        ${payload.tags.map(tag => `<span class="tag-badge">${tag}</span>`).join('')}
+      </div>
+      <div class="no-match-card">
+        <span class="tag">NO CONFIDENT MATCH</span>
+        ${escapeHtml(payload.message)}
+        <div class="no-match-section">
+          <h5>Possible Reasons</h5>
+          <ul>
+            ${payload.possible_reasons.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="no-match-section">
+          <h5>Recommended Actions</h5>
+          <ul>
+            ${payload.recommended_actions.map(a => `<li>${escapeHtml(a)}</li>`).join('')}
+          </ul>
+        </div>
+      </div>
+      <div class="lat-footer">retrieved in ${payload.retrieval_ms}ms</div>
+    </div>`;
+}
+
+function renderAssistantMessage(text, isTyping, metadata, sources, retrievalMs, generationMs){
+  let html = `
+    <div class="msg-bubble">
+      <div class="msg-meta">
+        <span class="role-tag assistant">ASSISTANT</span>
+        <span>${nowStamp()}</span>
+        ${metadata.severity ? `<span class="severity-badge severity-${metadata.severity}">${metadata.severity}</span>` : ''}
+      </div>`;
+
+  if(metadata.top1_cosine){
+    html += `
+      <div class="confidence-container">
+        <div class="confidence-bar">
+          <div class="confidence-fill ${metadata.confidence_label}" style="width: ${metadata.top1_cosine * 100}%"></div>
+        </div>
+        <span class="confidence-label ${metadata.confidence_label}">${metadata.confidence_label}</span>
+        <span class="confidence-text">(${Math.round(metadata.top1_cosine * 100)}%)</span>
+      </div>`;
+  }
+
+  if(metadata.tags && metadata.tags.length){
+    html += `
+      <div class="tags-container">
+        ${metadata.tags.map(tag => `<span class="tag-badge">${tag}</span>`).join('')}
+      </div>`;
+  }
+
+  html += `
+      <div class="timeline">
+        <div class="timeline-item"><span class="timeline-dot active"></span>Alert</div>
+        <div class="timeline-line"></div>
+        <div class="timeline-item"><span class="timeline-dot active"></span>Diagnosis</div>
+        <div class="timeline-line"></div>
+        <div class="timeline-item"><span class="timeline-dot active"></span>Retrieval</div>
+        <div class="timeline-line"></div>
+        <div class="timeline-item"><span class="timeline-dot"></span>Recommendation</div>
+        <div class="timeline-line"></div>
+        <div class="timeline-item"><span class="timeline-dot"></span>Verification</div>
+        <div class="timeline-line"></div>
+        <div class="timeline-item"><span class="timeline-dot"></span>Resolved</div>
+      </div>`;
+
+  html += `<div class="assistant-text">${linkifySources(formatText(text))}${isTyping ? '<span class="cursor"></span>' : ''}</div>`;
+
+  if(!isTyping && sources && sources.length){
+    html += `<div class="citations">`;
+    sources.forEach((s, i) => {
+      const n = i + 1;
+      const sparseOnly = s.matched_sparse && !s.matched_dense;
+      const badge = s.matched_dense && s.matched_sparse ? 'DENSE+BM25' : s.matched_dense ? 'DENSE' : 'BM25';
+      const rank = i === 0 ? 'primary' : (i <= 2 ? 'supporting' : 'additional');
+      const rankLabel = i === 0 ? 'Primary Source' : (i <= 2 ? 'Supporting Source' : 'Additional Reference');
+      html += `
+        <div class="citation-card ${rank} ${sparseOnly ? 'sparse-only' : ''}" data-id="${n}" data-active="1" onclick="toggleCitation(this)">
           <div class="cite-head">
+            <span class="cite-rank ${rank}">${rankLabel}</span>
             <span class="cite-id">SRC ${String(n).padStart(2,'0')}</span>
             <span class="cite-path">${escapeHtml(s.file)} — ${escapeHtml(s.section)}</span>
             <span class="cite-badge">${badge}</span>
             <span class="cite-lines">L${s.start_line}-${s.end_line}</span>
           </div>
-          <div class="cite-snippet">${escapeHtml(s.text)}</div>`;
-        citeWrap.appendChild(card);
-      });
-      msgDiv.querySelector('.msg-bubble').appendChild(citeWrap);
-    } else if(!textEl.querySelector('.no-match-card')){
-      textEl.innerHTML = linkifySources(formatText(rawText || '(no response)'));
+          <div class="cite-snippet">${escapeHtml(s.text)}</div>
+        </div>`;
+    });
+    html += `</div>`;
+
+    if(metadata.next_questions){
+      html += `
+        <div class="next-questions">
+          <h5>Recommended Next Questions</h5>
+          <div class="next-questions-list">
+            ${metadata.next_questions.map(q => `
+              <div class="next-question-chip" onclick="input.value='${escapeHtml(q)}'; sendQuery();">
+                ${escapeHtml(q)}
+              </div>
+            `).join('')}
+          </div>
+        </div>`;
     }
 
-    const lat = document.createElement('div');
-    lat.className = 'lat-footer';
-    lat.textContent = `retrieved in ${retrievalMs}ms` + (generationMs ? ` · generated in ${generationMs}ms` : '');
-    msgDiv.querySelector('.msg-bubble').appendChild(lat);
+    if(metadata.retrieval_analytics){
+      html += `
+        <button class="analytics-toggle" onclick="toggleAnalytics(this)">▼ Retrieval Analytics</button>
+        <div class="analytics-panel">
+          <div class="analytics-row"><span class="analytics-label">Chunks Retrieved</span><span class="analytics-value">${metadata.retrieval_analytics.chunks_retrieved}</span></div>
+          <div class="analytics-row"><span class="analytics-label">Dense Matches</span><span class="analytics-value">${metadata.retrieval_analytics.dense_matches}</span></div>
+          <div class="analytics-row"><span class="analytics-label">Sparse Matches</span><span class="analytics-value">${metadata.retrieval_analytics.sparse_matches}</span></div>
+          <div class="analytics-row"><span class="analytics-label">Hybrid Score Avg</span><span class="analytics-value">${metadata.retrieval_analytics.hybrid_score_avg.toFixed(4)}</span></div>
+        </div>`;
+    }
 
-  } catch(err){
-    textEl.innerHTML = `<div class="no-match-card"><span class="tag">CONNECTION ERROR</span>Could not reach the backend. Is server.py running? (${escapeHtml(String(err))})</div>`;
-  } finally {
-    sendBtn.disabled = false;
-    scrollDown();
+    html += `
+      <div class="checklist" id="checklist-${Date.now()}">
+        <h5>Engineer Verification Checklist</h5>
+        <div class="checklist-item" onclick="this.classList.toggle('completed')">
+          <div class="checklist-checkbox"><span class="checklist-checkmark">✓</span></div>
+          <span class="checklist-text">Acknowledge incident</span>
+        </div>
+        <div class="checklist-item" onclick="this.classList.toggle('completed')">
+          <div class="checklist-checkbox"><span class="checklist-checkmark">✓</span></div>
+          <span class="checklist-text">Verify root cause</span>
+        </div>
+        <div class="checklist-item" onclick="this.classList.toggle('completed')">
+          <div class="checklist-checkbox"><span class="checklist-checkmark">✓</span></div>
+          <span class="checklist-text">Apply remediation steps</span>
+        </div>
+        <div class="checklist-item" onclick="this.classList.toggle('completed')">
+          <div class="checklist-checkbox"><span class="checklist-checkmark">✓</span></div>
+          <span class="checklist-text">Confirm resolution</span>
+        </div>
+      </div>
+
+      <div class="summary-section">
+        <button class="summary-btn" onclick="toggleSummary(this)">📋 Generate Incident Summary</button>
+        <div class="summary-content">
+          <h5>Incident Summary</h5>
+          <p><b>Incident:</b> ${escapeHtml(conversationHistory.length > 0 ? conversationHistory[conversationHistory.length - 2]?.content : 'N/A')}</p>
+          <p><b>Symptoms:</b> ${escapeHtml(text.split('\n')[0] || 'N/A')}</p>
+          <p><b>Root Cause:</b> Analyzed from retrieved runbooks</p>
+          <p><b>Actions Taken:</b> Applied recommended steps</p>
+          <p><b>Severity:</b> ${metadata.severity || 'N/A'}</p>
+          <div class="summary-actions">
+            <button class="download-btn" onclick="downloadSummary(this)">⬇️ Download as Markdown</button>
+          </div>
+        </div>
+      </div>`;
+
+    if(retrievalMs){
+      html += `<div class="lat-footer">retrieved in ${retrievalMs}ms${generationMs ? ` · generated in ${generationMs}ms` : ''}</div>`;
+    }
   }
+
+  html += `</div>`;
+  return html;
+}
+
+function toggleAnalytics(btn){
+  const panel = btn.nextElementSibling;
+  panel.classList.toggle('visible');
+  btn.textContent = panel.classList.contains('visible') ? '▲ Retrieval Analytics' : '▼ Retrieval Analytics';
+}
+
+function toggleSummary(btn){
+  const content = btn.nextElementSibling;
+  content.classList.toggle('visible');
+}
+
+function downloadSummary(btn){
+  const summaryDiv = btn.closest('.summary-content');
+  let summaryText = '# Incident Summary\n\n';
+  summaryText += `**Incident:** ${summaryDiv.querySelector('p:nth-of-type(1)').textContent.replace('Incident: ', '')}\n\n`;
+  summaryText += `**Symptoms:** ${summaryDiv.querySelector('p:nth-of-type(2)').textContent.replace('Symptoms: ', '')}\n\n`;
+  summaryText += `**Root Cause:** ${summaryDiv.querySelector('p:nth-of-type(3)').textContent.replace('Root Cause: ', '')}\n\n`;
+  summaryText += `**Actions Taken:** ${summaryDiv.querySelector('p:nth-of-type(4)').textContent.replace('Actions Taken: ', '')}\n\n`;
+  summaryText += `**Severity:** ${summaryDiv.querySelector('p:nth-of-type(5)').textContent.replace('Severity: ', '')}\n`;
+  
+  const blob = new Blob([summaryText], {type: 'text/markdown'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `incident-summary-${Date.now()}.md`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 renderChips();
