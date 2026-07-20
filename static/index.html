@@ -306,6 +306,20 @@
     white-space:pre;
   }
 
+  .incident-resolution-panel {
+    background: rgba(22, 27, 37, 0.4);
+    border: 1px solid rgba(35, 42, 56, 0.8);
+    border-radius: 10px;
+    padding: 16px;
+    backdrop-filter: blur(8px);
+  }
+
+  .incident-panel-divider {
+    height: 2px;
+    background: linear-gradient(90deg, rgba(63,214,196,0.4), rgba(255,176,32,0.4), rgba(63,214,196,0.4));
+    margin: 8px 0 16px;
+  }
+
   .cursor{
     display:inline-block;
     width:7px; height:15px;
@@ -1155,7 +1169,10 @@ function renderAssistantMessage(text, isTyping, metadata, sources, retrievalMs, 
         <div class="timeline-item"><span class="timeline-dot"></span>Resolved</div>
       </div>`;
 
-  html += `<div class="assistant-text">${linkifySources(formatText(text))}${isTyping ? '<span class="cursor"></span>' : ''}</div>`;
+  html += `<div class="incident-resolution-panel">
+              <div class="incident-panel-divider"></div>
+              <div class="assistant-text">${linkifySources(formatText(text))}${isTyping ? '<span class="cursor"></span>' : ''}</div>
+            </div>`;
 
   if(!isTyping && sources && sources.length){
     html += `<div class="citations">`;

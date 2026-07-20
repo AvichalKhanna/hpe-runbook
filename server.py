@@ -407,16 +407,16 @@ def query(req: QueryRequest):
         if not sources or top1_cosine < CONFIDENCE_THRESHOLD:
             payload = {
                 "type": "no_match",
-                "message": "No confident runbook found.",
+                "message": "No sufficiently confident operational guidance found.",
                 "possible_reasons": [
-                    "Missing documentation",
-                    "Different incident",
-                    "Unknown error"
+                    "Documentation unavailable",
+                    "Unknown incident",
+                    "Query too broad"
                 ],
                 "recommended_actions": [
-                    "Escalate to on-call lead",
-                    "Search internal wiki manually",
-                    "Upload new runbook"
+                    "Refine query",
+                    "Upload runbook",
+                    "Escalate to on-call engineer"
                 ],
                 "top1_cosine": round(top1_cosine, 3),
                 "confidence_label": confidence_label,
