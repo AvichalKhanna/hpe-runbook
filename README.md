@@ -37,31 +37,28 @@ Answers on-call questions like *"what do I do if the database connection pool is
 At the top level, a query moves through three stages — **ingest once, retrieve + generate on every question**:
 
 ```mermaid
-flowchart TD
-    A["Runbooks (.md .pdf .docx .pptx)"]
-        --> B["ingest.py → Structure-aware Chunker"]
-        --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
+flowchart LR
+    A["Runbooks (.md/.pdf/.docx/.pptx)"] --> B["ingest.py → Chunker"]
+    B --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
 
-    Q["On-call Question"]
-        --> D["Dense Search (MiniLM-L6 + FAISS)"]
-    Q --> E["Sparse Search (BM25 Okapi)"]
+    Q["On-call Question"] --> D["Dense Search (FAISS)"]
+    Q --> E["Sparse Search (BM25)"]
 
     C -.-> D
     C -.-> E
 
-    D --> F["Reciprocal Rank Fusion (RRF)"]
+    D --> F["Reciprocal Rank Fusion"]
     E --> F
-    F --> G["Cross-Encoder Rerank (bge-reranker-base)"]
+    F --> G["Rerank (bge-reranker-base)"]
 
     G --> H{"Confident Match?"}
-    H -->|No| I["Escalate Card (no hallucination)"]
-    H -->|Yes| J["Prompt Builder (XML-delimited, injection-hardened)"]
+    H -->|No| I["Escalate Card"]
+    H -->|Yes| J["Prompt Builder (XML-safe)"]
 
-    J --> K["Qwen2.5-3B-Instruct (GGUF via llama-cpp)"]
-    K --> L["Frontend (static/index.html, SSE streaming + citations)"]
+    J --> K["LLM (Qwen2.5-3B via llama-cpp)"]
+    K --> L["Frontend (index.html + SSE)"]
 
-    %% Styling for readability
-    style A fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
+    %% Styling
     style C fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
     style F fill:#0d1117,stroke:#8957E5,color:#C9D1D9
     style H fill:#0d1117,stroke:#F58025,color:#C9D1D9
