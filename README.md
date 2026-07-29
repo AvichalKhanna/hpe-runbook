@@ -37,23 +37,31 @@ Answers on-call questions like *"what do I do if the database connection pool is
 At the top level, a query moves through three stages — **ingest once, retrieve + generate on every question**:
 
 ```mermaid
-flowchart LR
-    A["Runbooks<br/>(.md .pdf .docx .pptx)"] -->|ingest.py| B["Structure-aware<br/>Chunker"]
-    B --> C[("index_store/<br/>faiss.index · bm25.pkl<br/>chunks.json")]
+flowchart TD
+    A["Runbooks (.md .pdf .docx .pptx)"]
+        --> B["ingest.py → Structure-aware Chunker"]
+        --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
 
-    Q["On-call question"] --> D["Dense Search<br/>MiniLM-L6 + FAISS"]
-    Q --> E["Sparse Search<br/>BM25 Okapi"]
+    Q["On-call Question"]
+        --> D["Dense Search (MiniLM-L6 + FAISS)"]
+    Q --> E["Sparse Search (BM25 Okapi)"]
+
     C -.-> D
     C -.-> E
-    D --> F{"Reciprocal Rank<br/>Fusion"}
-    E --> F
-    F --> G["Cross-Encoder Rerank<br/>bge-reranker-base"]
-    G --> H{"Confident<br/>match?"}
-    H -->|no| I["Escalate card<br/>no hallucination"]
-    H -->|yes| J["Prompt Builder<br/>XML-delimited + injection-hardened"]
-    J --> K["Qwen2.5-3B-Instruct<br/>GGUF via llama-cpp"]
-    K --> L["static/index.html<br/>SSE streaming + cited sources"]
 
+    D --> F["Reciprocal Rank Fusion (RRF)"]
+    E --> F
+    F --> G["Cross-Encoder Rerank (bge-reranker-base)"]
+
+    G --> H{"Confident Match?"}
+    H -->|No| I["Escalate Card (no hallucination)"]
+    H -->|Yes| J["Prompt Builder (XML-delimited, injection-hardened)"]
+
+    J --> K["Qwen2.5-3B-Instruct (GGUF via llama-cpp)"]
+    K --> L["Frontend (static/index.html, SSE streaming + citations)"]
+
+    %% Styling for readability
+    style A fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
     style C fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
     style F fill:#0d1117,stroke:#8957E5,color:#C9D1D9
     style H fill:#0d1117,stroke:#F58025,color:#C9D1D9
