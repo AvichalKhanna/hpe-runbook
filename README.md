@@ -1,81 +1,101 @@
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=venom&color=0:0d1117,35:111827,70:0d1f3c,100:0d1117&height=220&section=header&text=Runbook%20Console&fontSize=50&fontColor=58A6FF&fontAlignY=45&desc=RAG%20Chatbot%20for%20On-Call%20Engineers&descAlignY=67&descSize=18&descColor=C9D1D9&animation=fadeIn" width="100%" />
-</div>
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:16213e,100:0d1117&height=200&section=header&text=Runbook%20Console&fontSize=48&fontColor=58A6FF&fontAlignY=38&animation=fadeIn" width="100%" />
 
-<div align="center">
-
-[![Typing SVG](https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=600&size=18&duration=3000&pause=1000&color=58A6FF&center=true&vCenter=true&width=750&lines=Grounded+answers%2C+not+guesses;Every+citation+traces+to+a+file%2C+section%2C+and+line;Hybrid+retrieval+%7C+Local+LLM+%7C+Zero+external+calls;Built+for+the+HPE+Hackathon)](https://git.io/typing-svg)
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=500&size=16&duration=2800&pause=900&color=8B949E&center=true&vCenter=true&width=700&lines=Ask+a+question.+Get+a+cited+answer.+Nothing+invented.;Hybrid+retrieval+%E2%80%94+dense+%2B+sparse+%2B+reranked;Runs+entirely+on+your+machine.+No+API+keys%2C+no+egress." alt="Typing SVG" />
 
 <br/>
+
+<a href="#architecture"><img src="https://img.shields.io/badge/-Architecture-0d1117?style=for-the-badge&logo=diagramsdotnet&logoColor=58A6FF" /></a>
+<a href="#setup"><img src="https://img.shields.io/badge/-Setup-0d1117?style=for-the-badge&logo=windowsterminal&logoColor=58A6FF" /></a>
+<a href="#using-it"><img src="https://img.shields.io/badge/-Usage-0d1117?style=for-the-badge&logo=googlechrome&logoColor=58A6FF" /></a>
+<a href="#tuning-knobs"><img src="https://img.shields.io/badge/-Tuning-0d1117?style=for-the-badge&logo=tuning&logoColor=58A6FF" /></a>
+<a href="#demo-script"><img src="https://img.shields.io/badge/-Demo-0d1117?style=for-the-badge&logo=playstation&logoColor=58A6FF" /></a>
+<a href="#screenshots"><img src="https://img.shields.io/badge/-Screenshots-0d1117?style=for-the-badge&logo=camera&logoColor=58A6FF" /></a>
+
+<br/><br/>
 
 ![Python](https://img.shields.io/badge/Python-3.10%20%2F%203.11-3776AB?style=flat-square&logo=python&logoColor=white&labelColor=0d1117)
 ![FastAPI](https://img.shields.io/badge/FastAPI-SSE%20Streaming-009688?style=flat-square&logo=fastapi&logoColor=white&labelColor=0d1117)
 ![FAISS](https://img.shields.io/badge/FAISS-Vector%20Search-4B8BBE?style=flat-square&labelColor=0d1117)
 ![BM25](https://img.shields.io/badge/BM25-Sparse%20Retrieval-8A63D2?style=flat-square&labelColor=0d1117)
-![LLM](https://img.shields.io/badge/Qwen2.5--3B-GGUF%20%2F%20llama--cpp-F58025?style=flat-square&labelColor=0d1117)
+![Qwen](https://img.shields.io/badge/Qwen2.5--3B-GGUF%20%2F%20llama--cpp-F58025?style=flat-square&labelColor=0d1117)
 ![Local](https://img.shields.io/badge/100%25-Local%20%26%20Offline-2EA043?style=flat-square&labelColor=0d1117)
 ![Status](https://img.shields.io/badge/status-hackathon%20build-8957E5?style=flat-square&labelColor=0d1117)
 
-</div>
-
-<p align="center">
 <sub>HPE Hackathon submission for <strong>#11: Runbook Chatbot Using Retrieval-Augmented Generation</strong> (AIOps / Knowledge Management)</sub>
-</p>
-
-<div align="center">
-
-──────────────────────────────
 
 </div>
+
+<br/>
 
 Answers on-call questions like *"what do I do if the database connection pool is exhausted?"* with a specific, grounded answer citing the exact runbook file, section, page number, and line range it came from — fully local, no external API calls, no API keys.
 
 <br/>
 
-<div align="center">
+<h2 id="architecture">Architecture</h2>
 
-## Architectural Model
+At the top level, a query moves through three stages — **ingest once, retrieve + generate on every question**:
 
-**Full Pipeline Overview**
+```mermaid
+flowchart LR
+    A["Runbooks<br/>(.md .pdf .docx .pptx)"] -->|ingest.py| B["Structure-aware<br/>Chunker"]
+    B --> C[("index_store/<br/>faiss.index · bm25.pkl<br/>chunks.json")]
 
-</div>
+    Q["On-call question"] --> D["Dense Search<br/>MiniLM-L6 + FAISS"]
+    Q --> E["Sparse Search<br/>BM25 Okapi"]
+    C -.-> D
+    C -.-> E
+    D --> F{"Reciprocal Rank<br/>Fusion"}
+    E --> F
+    F --> G["Cross-Encoder Rerank<br/>bge-reranker-base"]
+    G --> H{"Confident<br/>match?"}
+    H -->|no| I["Escalate card<br/>no hallucination"]
+    H -->|yes| J["Prompt Builder<br/>XML-delimited + injection-hardened"]
+    J --> K["Qwen2.5-3B-Instruct<br/>GGUF via llama-cpp"]
+    K --> L["static/index.html<br/>SSE streaming + cited sources"]
 
+    style C fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
+    style F fill:#0d1117,stroke:#8957E5,color:#C9D1D9
+    style H fill:#0d1117,stroke:#F58025,color:#C9D1D9
+    style I fill:#0d1117,stroke:#F85149,color:#C9D1D9
+    style L fill:#0d1117,stroke:#2EA043,color:#C9D1D9
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│                         STRATUM AI — RUNBOOK CHATBOT                             │
-├─────────────────┬────────────────────────────────┬───────────────────────────────┤
-│   INGESTION     │        RETRIEVAL               │         GENERATION            │
-│                 │                                │                               │
-│  runbooks/      │  ┌─────────────┐              │  ┌─────────────────────────┐  │
-│  (.md, .pdf,   ─┼─▶│  Embedder   │──FAISS───────┼─▶│  Cross-Encoder Reranker │  │
-│   .docx, .pptx) │  │  MiniLM-L6  │              │  │  (bge-reranker-base)    │  │
-│                 │  └─────────────┘              │  └────────────┬────────────┘  │
-│  ingest.py      │                                │               │               │
-│  ┌───────────┐  │  ┌─────────────┐              │  ┌────────────▼────────────┐  │
-│  │  Chunker  │  │  │  BM25 Okapi │──BM25────────┼─▶│  Prompt Builder         │  │
-│  │  (struct- │  │  │  (sparse)   │              │  │  (XML-delimited, prompt │  │
-│  │  aware)   │  │  └─────────────┘              │  │   injection hardened)   │  │
-│  └───────────┘  │          │                    │  └────────────┬────────────┘  │
-│       │         │          ▼                    │               │               │
-│       ▼         │  Reciprocal Rank Fusion (RRF) │  ┌────────────▼────────────┐  │
-│  index_store/   │          │                    │  │  Qwen2.5-3B-Instruct    │  │
-│  faiss.index    │          ▼                    │  │  (GGUF / llama-cpp)     │  │
-│  bm25.pkl       │  Top-K candidates + Rerank    │  │  SSE streaming tokens   │  │
-│  chunks.json    │                               │  └────────────┬────────────┘  │
-└─────────────────┴────────────────────────────────┴──────────────┼───────────────┘
-                                                                   ▼
-                                                        static/index.html
-                                                  (ChatGPT-style UI with:
-                                                   • Incident History sidebar
-                                                   • Dark / Light theme toggle
-                                                   • Expandable source citations
-                                                     with page numbers + line ranges
-                                                   • SSE token streaming)
+
+The confidence gate matters more than it looks: if `CONFIDENCE_THRESHOLD` isn't cleared, the LLM is never invoked at all — the escalate card is the only possible output for that path. There's no code path where the model can answer without either a passing retrieval score or an explicit "I don't know."
+
+<br/>
+
+**Request lifecycle**, end to end for a single question:
+
+```mermaid
+sequenceDiagram
+    participant U as Engineer
+    participant S as FastAPI Server
+    participant R as Hybrid Retriever
+    participant X as Reranker
+    participant L as Qwen2.5-3B (local)
+
+    U->>S: "db pool exhausted, what now?"
+    S->>R: normalize + expand abbreviations
+    par dense + sparse in parallel
+        R->>R: FAISS cosine top-K
+        R->>R: BM25 Okapi top-K
+    end
+    R->>R: fuse ranks (RRF, k=60)
+    R->>X: top candidates
+    X->>S: reranked chunks + scores
+    alt top score < threshold
+        S-->>U: "no confident match" card
+    else confident match
+        S->>L: XML-delimited prompt + context
+        L-->>S: streamed tokens (SSE)
+        S-->>U: answer + [Source N] citation cards
+    end
 ```
 
 <br/>
 
-**Key Components**
+**Key components**
 
 | Layer | Technology | Purpose |
 |:---|:---|:---|
@@ -137,13 +157,9 @@ Embeddings (MiniLM-L6-v2), generation (Qwen2.5-3B-Instruct GGUF via `llama-cpp-p
 
 <br/>
 
-<div align="center">
-
-──────────────────────────────
+---
 
 ## Project Layout
-
-</div>
 
 ```
 hpe-runbook-main/
@@ -181,13 +197,9 @@ hpe-runbook-main/
     └── index.html            # the full console UI (single file, no build step)
 ```
 
-<div align="center">
+---
 
-──────────────────────────────
-
-## Setup
-
-</div>
+<h2 id="setup">Setup</h2>
 
 **Prerequisites**
 
@@ -246,13 +258,9 @@ INFO:     Uvicorn running on http://127.0.0.1:8000
 
 Open your browser and go to **http://127.0.0.1:8000/**
 
-<div align="center">
+---
 
-──────────────────────────────
-
-## Using It
-
-</div>
+<h2 id="using-it">Using It</h2>
 
 - Click one of the suggested incident chips, or type your own question.
 - The response streams token-by-token from the local LLM.
@@ -262,15 +270,11 @@ Open your browser and go to **http://127.0.0.1:8000/**
 - Use the **theme toggle** in the top-right to switch between Dark and Light mode.
 - Use the **sidebar button** in the top-left to open/close your Incident History — click any past incident to restore the full conversation.
 
-<div align="center">
+---
 
-──────────────────────────────
-
-## Tuning Knobs
+<h2 id="tuning-knobs">Tuning Knobs</h2>
 
 <sub>top of <code>server.py</code> / <code>config/settings.py</code></sub>
-
-</div>
 
 | Constant | What it does |
 |:---|:---|
@@ -282,15 +286,11 @@ Open your browser and go to **http://127.0.0.1:8000/**
 | `RERANKER_HIGH_THRESHOLD` | score above which a chunk is always included after reranking |
 | `CHUNK_MAX_WORDS` | maximum words per chunk before splitting with overlap |
 
-<div align="center">
+---
 
-──────────────────────────────
-
-## Demo Script
+<h2 id="demo-script">Demo Script</h2>
 
 <sub>suggested, ~2 minutes</sub>
-
-</div>
 
 1. Ask the exact prompt from the challenge brief: *"what do I do if the database connection pool is exhausted?"* — show the streamed, cited answer, then click a `[Source N]` chip to show it jumps to the real runbook excerpt with the page number.
 2. Ask something phrased very differently from the doc's wording (e.g. *"app is timing out talking to postgres, is that a pool problem?"*) to show dense retrieval catching paraphrased intent.
@@ -298,26 +298,20 @@ Open your browser and go to **http://127.0.0.1:8000/**
 4. Ask something not covered by any runbook (e.g. *"how do I reset a forgotten Jira password"*) to show the honest no-match / escalate card instead of a hallucinated answer.
 5. Mention the status ticker: fully local stack, chunk/file counts, hybrid retrieval mode — no external API calls at any point in the pipeline.
 
-<div align="center">
-
-──────────────────────────────
+---
 
 ## Extending This for Production
-
-</div>
 
 - Swap the sample `runbooks/` for a scheduled ingestion job pointed at your real Confluence/GitHub/S3 runbook sources.
 - Swap `IndexFlatIP` for `IndexHNSWFlat` in `ingest.py` if the corpus grows past a few tens of thousands of chunks (flat search is exact but linear; HNSW trades a little recall for sub-linear search).
 - Add an auth layer in front of `server.py` before exposing it beyond localhost.
 - Log query → retrieved sources → answer → (optional) engineer feedback thumbs-up/down to build a dataset for evaluating and improving retrieval quality over time.
 
+---
+
+<h2 id="screenshots">Screenshots</h2>
+
 <div align="center">
-
-──────────────────────────────
-
-## Screenshots
-
-<br/>
 
 **Landing Page**
 
@@ -340,9 +334,6 @@ Open your browser and go to **http://127.0.0.1:8000/**
 <br/>
 
 <div align="center">
-<img src="https://capsule-render.vercel.app/api?type=venom&color=0:0d1117,35:111827,70:0d1f3c,100:0d1117&height=100&section=footer" width="100%" />
-</div>
-
-<p align="center">
+<img src="https://capsule-render.vercel.app/api?type=waving&color=0:0d1117,50:16213e,100:0d1117&height=120&section=footer" width="100%" />
 <sub>Built for the HPE Hackathon — 100% local, no external API calls, no API keys.</sub>
-</p>
+</div>
