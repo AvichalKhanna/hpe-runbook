@@ -38,25 +38,31 @@ At the top level, a query moves through three stages — **ingest once, retrieve
 
 ```mermaid
 flowchart LR
-    A["Runbooks (.md/.pdf/.docx/.pptx)"] --> B["ingest.py → Chunker"]
-    B --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
+    subgraph Ingest
+        A["Runbooks (.md/.pdf/.docx/.pptx)"] --> B["ingest.py → Chunker"]
+        B --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
+    end
 
-    Q["On-call Question"] --> D["Dense Search (FAISS)"]
-    Q --> E["Sparse Search (BM25)"]
+    subgraph Retrieval
+        Q["On-call Question"] --> D["Dense Search (FAISS)"]
+        Q --> E["Sparse Search (BM25)"]
+        C -.-> D
+        C -.-> E
+        D --> F["Rank Fusion"]
+        E --> F
+        F --> G["Rerank (bge-reranker-base)"]
+    end
 
-    C -.-> D
-    C -.-> E
+    subgraph Decision
+        G --> H{"Confident Match?"}
+        H -->|No| I["Escalate Card"]
+        H -->|Yes| J["Prompt Builder (XML-safe)"]
+    end
 
-    D --> F["Reciprocal Rank Fusion"]
-    E --> F
-    F --> G["Rerank (bge-reranker-base)"]
-
-    G --> H{"Confident Match?"}
-    H -->|No| I["Escalate Card"]
-    H -->|Yes| J["Prompt Builder (XML-safe)"]
-
-    J --> K["LLM (Qwen2.5-3B via llama-cpp)"]
-    K --> L["Frontend (index.html + SSE)"]
+    subgraph Generation
+        J --> K["LLM (Qwen2.5-3B via llama-cpp)"]
+        K --> L["Frontend (index.html + SSE)"]
+    end
 
     %% Styling
     style C fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
@@ -64,6 +70,7 @@ flowchart LR
     style H fill:#0d1117,stroke:#F58025,color:#C9D1D9
     style I fill:#0d1117,stroke:#F85149,color:#C9D1D9
     style L fill:#0d1117,stroke:#2EA043,color:#C9D1D9
+
 ```
 
 The confidence gate matters more than it looks: if `CONFIDENCE_THRESHOLD` isn't cleared, the LLM is never invoked at all — the escalate card is the only possible output for that path. There's no code path where the model can answer without either a passing retrieval score or an explicit "I don't know."
