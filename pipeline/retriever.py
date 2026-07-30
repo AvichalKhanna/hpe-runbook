@@ -12,34 +12,27 @@ class HybridRetriever:
         self.bm25 = bm25
         self.chunks = chunks
 
-    async def retrieve(self, query: str, metadata_filter: Optional[Dict] = None) -> Tuple[List[dict], float, int]:
+    def retrieve(self, query: str, metadata_filter: Optional[Dict] = None) -> Tuple[List[dict], float, int]:
         start_time = time.time()
-        
-        # We do not strictly implement sub-indices here as doing so dynamically is O(N).
-        # We'll retrieve more and filter later, or filter first if needed.
         
         candidates = []
         top1_cosine = 0.0
         
-        async def do_faiss():
-            if not self.faiss_index: return []
+        # FAISS retrieval
+        faiss_results = []
+        if self.faiss_index:
             q_emb = self.embedder.encode([query])
             D, I = self.faiss_index.search(q_emb, TOP_K_DENSE)
-            return [(I[0][i], D[0][i]) for i in range(len(I[0])) if I[0][i] != -1]
+            faiss_results = [(I[0][i], D[0][i]) for i in range(len(I[0])) if I[0][i] != -1]
             
-        def do_bm25():
-            if not self.bm25: return []
+        # BM25 retrieval
+        bm25_results = []
+        if self.bm25:
             import re
             tokenized_query = re.findall(r'\w+', query.lower())
             scores = self.bm25.get_scores(tokenized_query)
             top_n = np.argsort(scores)[::-1][:TOP_K_SPARSE]
-            return [(idx, scores[idx]) for idx in top_n if scores[idx] > 0]
-            
-        loop = asyncio.get_event_loop()
-        faiss_results, bm25_results = await asyncio.gather(
-            do_faiss(),
-            loop.run_in_executor(None, do_bm25)
-        )
+            bm25_results = [(idx, scores[idx]) for idx in top_n if scores[idx] > 0]
         
         if faiss_results:
             top1_cosine = float(faiss_results[0][1])

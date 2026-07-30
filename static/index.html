@@ -582,6 +582,36 @@ body {
 /* ==========================================================================
    20. RESPONSIVE
    ========================================================================== */
+.feedback-row { display: flex; gap: 8px; margin-top: 10px; }
+.feedback-btn { background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-secondary); border-radius: 4px; padding: 4px 8px; cursor: pointer; }
+.feedback-btn:hover { background: var(--accent-glow); }
+.feedback-btn.active { border-color: var(--accent-blue); }
+.near-miss-container { margin-top: 12px; border-top: 1px dashed rgba(248,113,113,.2); padding-top: 12px; }
+.near-miss-card { background: rgba(0,0,0,0.1); padding: 8px; border-radius: 4px; margin-bottom: 8px; }
+.score-bar-bg { background: var(--bg-elevated); height: 4px; border-radius: 2px; margin: 4px 0; }
+.score-bar-fill { background: var(--warning); height: 100%; border-radius: 2px; }
+.conflict-badge { color: #1a1200; background: var(--critical); font-size: 9.5px; font-weight: bold; padding: 1px 6px; border-radius: 3px; }
+.conflict-card { border-left-color: var(--warning) !important; }
+.metric-bar-row { margin-bottom: 10px; font-size: 11px; }
+.metric-bar-bg { background: var(--bg-elevated); height: 6px; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.metric-bar-fill { background: var(--accent-blue); height: 100%; transition: width 0.3s; }
+.metric-label { color: var(--text-secondary); }
+.metric-value { color: var(--text-primary); font-family: var(--mono); }
+.runbook-viewer { display: none; background: var(--bg-surface); border-left: 1px solid var(--border-subtle); flex-direction: column; overflow: hidden; }
+.runbook-viewer.active { display: flex; }
+.runbook-viewer-header { padding: 12px; font-weight: bold; border-bottom: 1px solid var(--border-subtle); background: var(--bg-elevated); }
+.runbook-viewer-body { padding: 16px; overflow-y: auto; flex: 1; font-size: 13px; line-height: 1.6; }
+.runbook-viewer-body mark { background: rgba(251,191,36,0.3); color: inherit; padding: 2px 4px; border-radius: 3px; }
+.shell-panel { position: fixed; bottom: -400px; left: 10%; width: 80%; height: 350px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px 8px 0 0; display: flex; flex-direction: column; transition: bottom 0.3s var(--ease); z-index: 1000; box-shadow: var(--shadow-lg); }
+.shell-panel.active { bottom: 0; }
+.shell-header { padding: 8px 12px; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; font-weight: bold; }
+.shell-output { flex: 1; padding: 12px; background: #000; color: #0f0; font-family: var(--mono); font-size: 12px; overflow-y: auto; white-space: pre-wrap; }
+.shell-input-row { display: flex; padding: 10px; border-top: 1px solid var(--border-subtle); gap: 8px; }
+.shell-input-row input { flex: 1; background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: #fff; padding: 6px 12px; border-radius: 4px; }
+.shell-input-row button { background: var(--accent-blue); color: #fff; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.patch-gap-btn { display: inline-block; margin-top: 12px; background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-subtle); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+.patch-gap-btn:hover { background: var(--bg-surface); }
+
 @media (max-width:1100px) {
   .workspace { grid-template-columns:1fr }
   .sidebar {
@@ -794,6 +824,8 @@ body[data-theme="light"] .history-time { color: #64748b; }
     <span id="stat-mode" class="stat accent">—</span>
   </div>
   <div class="topbar-right">
+    <button class="sidebar-toggle" id="btn-shell" title="Open Shell">⌨</button>
+    <button class="sidebar-toggle" id="btn-split-screen" title="Toggle Split Screen">◫</button>
     <button class="sidebar-toggle" id="theme-toggle" aria-label="Toggle theme" title="Toggle Light/Dark Theme" style="display:flex;">
       <svg id="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
       <svg id="theme-icon-sun" style="display:none;" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
@@ -876,6 +908,10 @@ body[data-theme="light"] .history-time { color: #64748b; }
       <div class="center-scroll" id="center-scroll">
         <div class="center-content" id="center-content"></div>
       </div>
+      <div id="runbook-viewer" class="runbook-viewer">
+        <div class="runbook-viewer-header">Runbook Viewer</div>
+        <div id="runbook-viewer-body" class="runbook-viewer-body">Select a citation to view the document.</div>
+      </div>
       <div class="workspace-input">
         <div class="prompt-box" id="prompt-box-ws">
           <button class="prompt-action upload-action" id="upload-btn-ws" title="Upload Runbook" aria-label="Upload runbook file">
@@ -895,6 +931,24 @@ body[data-theme="light"] .history-time { color: #64748b; }
     <!-- RIGHT SIDEBAR -->
     <aside class="sidebar sidebar-right" id="sidebar-right" role="complementary" aria-label="Incident insights">
       <button class="sidebar-close" id="close-right" aria-label="Close insights"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      <div class="sidebar-section" id="system-metrics-panel">
+        <div class="sidebar-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          <span>Live System</span>
+        </div>
+        <div class="metric-bar-row">
+          <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">CPU</span><span class="metric-value" id="sys-cpu-val">—</span></div>
+          <div class="metric-bar-bg"><div class="metric-bar-fill" id="sys-cpu" style="width:0%"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">RAM</span><span class="metric-value" id="sys-ram-val">—</span></div>
+          <div class="metric-bar-bg"><div class="metric-bar-fill" id="sys-ram" style="width:0%"></div></div>
+        </div>
+        <div class="metric-bar-row">
+          <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">Disk</span><span class="metric-value" id="sys-disk-val">—</span></div>
+          <div class="metric-bar-bg"><div class="metric-bar-fill" id="sys-disk" style="width:0%"></div></div>
+        </div>
+      </div>
       <div class="sidebar-section">
         <div class="sidebar-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -939,6 +993,22 @@ body[data-theme="light"] .history-time { color: #64748b; }
   </div><!-- /workspace -->
 </div><!-- /app-content -->
 
+<!-- ===== SHELL PANEL ===== -->
+<div id="shell-panel" class="shell-panel">
+  <div class="shell-header">
+    <span>Shell</span>
+    <button id="shell-close" style="background:none; border:none; color:inherit; cursor:pointer;">✕</button>
+  </div>
+  <div id="shell-output" class="shell-output"></div>
+  <div style="padding: 10px; text-align: center;">
+    <button id="shell-analyze-btn" style="background:var(--bg-elevated); color:var(--text-primary); border:1px solid var(--border-subtle); padding:6px 12px; border-radius:4px; cursor:pointer; font-size:12px;">Analyze Output in Chat</button>
+  </div>
+  <div class="shell-input-row">
+    <input id="shell-input" type="text" placeholder="Enter command...">
+    <button id="shell-send-btn">Send</button>
+  </div>
+</div>
+
 <script>
 /* ==========================================================================
    STRATUM AI · INCIDENT COPILOT — FRONTEND
@@ -957,6 +1027,9 @@ const SUGGESTIONS = [
 
 let appMode = 'landing';
 let currentIncidentId = null;
+let conversationHistory = [];
+let shellContext = null;
+let shellWs = null;
 let incidentHistory = [];
 try { incidentHistory = JSON.parse(localStorage.getItem('stratum_history') || '[]'); } catch(e) { incidentHistory = []; }
 let runbookFiles = [];
@@ -1194,6 +1267,7 @@ function loadIncident(id) {
   const inc = incidentHistory.find(h => h.id === id);
   if (!inc) return;
   currentIncidentId = id;
+  conversationHistory = inc.conversationHistory || [];
   switchToWorkspace();
   $('center-content').innerHTML = inc.htmlBlocks ? inc.htmlBlocks.join('') : '';
   scrollDown();
@@ -1227,6 +1301,7 @@ $('btn-clear-history').addEventListener('click', () => {
 
 $('btn-new-incident').addEventListener('click', () => {
   currentIncidentId = null;
+  conversationHistory = [];
   switchToLanding();
   closeSidebars();
 });
@@ -1355,11 +1430,14 @@ async function sendQuery(inputEl) {
   // Switch to workspace on first query or if starting a new incident
   if (appMode === 'landing' || !currentIncidentId) {
     currentIncidentId = 'inc_' + Date.now();
-    incidentHistory.unshift({ id: currentIncidentId, title: q, time: nowStamp(), ts: Date.now(), htmlBlocks: [] });
+    conversationHistory = [];
+    incidentHistory.unshift({ id: currentIncidentId, title: q, time: nowStamp(), ts: Date.now(), htmlBlocks: [], conversationHistory: [] });
     if (incidentHistory.length > 30) incidentHistory.length = 30;
     $('center-content').innerHTML = ''; // clear for new incident
     switchToWorkspace();
   }
+  
+  conversationHistory.push({ role: 'user', content: q });
   renderHistory();
 
   // Build incident group
@@ -1401,13 +1479,15 @@ async function sendQuery(inputEl) {
     const res = await fetch('/api/query', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({query: q})
+      body: JSON.stringify({query: q, conversation_history: conversationHistory, shell_context: shellContext})
     });
+    shellContext = null;
     if (!res.ok || !res.body) throw new Error('request failed');
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = '';
+    let requestId = null;
 
     while (true) {
       const {done, value} = await reader.read();
@@ -1423,7 +1503,20 @@ async function sendQuery(inputEl) {
 
         if (payload.type === 'no_match') {
           retrievalMs = payload.retrieval_ms;
-          textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">NO SAFE RUNBOOK MATCH</span>${escapeHtml(payload.message)}</div>`;
+          let nearMissHtml = '';
+          if (payload.near_misses && payload.near_misses.length > 0) {
+            nearMissHtml = `<div class="near-miss-container">
+              <div style="font-size: 11px; margin-bottom: 8px;">Confidence threshold: ${payload.threshold} | Top score: ${payload.top1_cosine}</div>`;
+            payload.near_misses.slice(0,3).forEach(nm => {
+              nearMissHtml += `<div class="near-miss-card">
+                <div style="font-size:10px; font-weight:bold;">${escapeHtml(nm.file)} — ${escapeHtml(nm.section)}</div>
+                <div class="score-bar-bg"><div class="score-bar-fill" style="width: ${Math.min(100, nm.score * 100)}%"></div></div>
+                <div style="font-size:10px; opacity:0.7;">${escapeHtml(nm.text_preview ? nm.text_preview.slice(0,100) : '')}...</div>
+              </div>`;
+            });
+            nearMissHtml += `</div>`;
+          }
+          textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">NO SAFE RUNBOOK MATCH</span>${escapeHtml(payload.message)}<button class="patch-gap-btn" id="patch-gap-btn-${currentIncidentId}">🔍 Search Web & Patch Gap</button>${nearMissHtml}</div>`;
           updateEvidenceSummary([], true);
           updatePerformance(retrievalMs, 0);
           updateSourcesList([]);
@@ -1431,6 +1524,7 @@ async function sendQuery(inputEl) {
         } else if (payload.type === 'sources') {
           sources = payload.sources;
           retrievalMs = payload.retrieval_ms;
+          requestId = payload.request_id;
         } else if (payload.type === 'token') {
           rawText += payload.text;
           textEl.innerHTML = linkifySources(formatText(rawText)) + '<div class="typing-indicator"><span></span><span></span><span></span></div>';
@@ -1462,14 +1556,18 @@ async function sendQuery(inputEl) {
         const sparseOnly = s.matched_sparse && !s.matched_dense;
         const badge = s.matched_dense && s.matched_sparse ? 'DENSE+BM25'
                     : s.matched_dense ? 'DENSE' : 'BM25';
+        const conflictBadge = s.conflict ? `<span class="conflict-badge">⚠ CONFLICT</span>` : '';
+        const cardClass = 'citation-card' + (sparseOnly ? ' sparse-only' : '') + (s.conflict ? ' conflict-card' : '');
         const card = document.createElement('div');
-        card.className = 'citation-card' + (sparseOnly ? ' sparse-only' : '');
+        card.className = cardClass;
         card.dataset.id = n;
         card.dataset.active = '1';
+        card.dataset.file = s.file;
         card.innerHTML = `
           <div class="cite-head">
             <span class="cite-id">SRC ${String(n).padStart(2,'0')}</span>
             <span class="cite-path">${escapeHtml(s.file)} — ${escapeHtml(s.section)}</span>
+            ${conflictBadge}
             <span class="cite-badge">${badge}</span>
             <span class="cite-lines">Pg ${s.page_number} | L${s.start_line}-${s.end_line}</span>
           </div>
@@ -1493,11 +1591,61 @@ async function sendQuery(inputEl) {
     group.appendChild(perfCard);
     updatePerformance(retrievalMs, generationMs);
 
+    if (requestId) {
+      const fb = document.createElement('div');
+      fb.className = 'feedback-row';
+      fb.innerHTML = `
+        <button class="feedback-btn" data-val="1">👍</button>
+        <button class="feedback-btn" data-val="-1">👎</button>
+      `;
+      fb.querySelectorAll('.feedback-btn').forEach(btn => {
+        btn.onclick = () => {
+          fb.querySelectorAll('.feedback-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          fetch('/api/feedback', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({request_id: requestId, query: q, rating: parseInt(btn.dataset.val)})
+          });
+          showToast('Thanks for your feedback!', 'success');
+        };
+      });
+      group.appendChild(fb);
+    }
+
+    const patchBtn = group.querySelector('.patch-gap-btn');
+    if (patchBtn) {
+      patchBtn.onclick = async () => {
+        patchBtn.disabled = true;
+        patchBtn.textContent = '⏳ Searching…';
+        try {
+          const pRes = await fetch('/api/patch_gap', {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({query: q})
+          });
+          if (!pRes.ok) throw new Error('patch failed');
+          showToast('✓ Created runbook from web. Re-asking…', 'success');
+          setTimeout(() => {
+            inputEl.value = q;
+            sendQuery(inputEl);
+          }, 1000);
+        } catch (e) {
+          showToast('Patch gap error', 'error');
+          patchBtn.disabled = false;
+          patchBtn.textContent = '🔍 Search Web & Patch Gap';
+        }
+      };
+    }
+    
+    conversationHistory.push({ role: 'assistant', content: rawText });
+
   } catch(err) {
     textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">CONNECTION ERROR</span>Could not reach the backend. Is server.py running? (${escapeHtml(String(err))})</div>`;
   } finally {
     const inc = incidentHistory.find(h => h.id === currentIncidentId);
     if (inc) {
+      inc.conversationHistory = conversationHistory;
       if (!inc.htmlBlocks) inc.htmlBlocks = [];
       inc.htmlBlocks.push(group.outerHTML);
       try { localStorage.setItem('stratum_history', JSON.stringify(incidentHistory)); } catch(e) {}
@@ -1517,6 +1665,94 @@ renderChips();
 loadStats();
 renderHistory();
 $('input').focus();
+
+let isSplitScreen = false;
+$('btn-split-screen').addEventListener('click', () => {
+  isSplitScreen = !isSplitScreen;
+  $('runbook-viewer').classList.toggle('active', isSplitScreen);
+  $('center-panel').style.flexDirection = isSplitScreen ? 'row' : 'column';
+  if (isSplitScreen) {
+    $('center-scroll').style.flex = '0 0 55%';
+    $('runbook-viewer').style.flex = '0 0 45%';
+  } else {
+    $('center-scroll').style.flex = '1';
+    $('runbook-viewer').style.flex = 'none';
+  }
+});
+
+document.addEventListener('click', async e => {
+  const card = e.target.closest('.citation-card');
+  if (card && $('center-content').contains(card) && isSplitScreen) {
+    const file = card.dataset.file;
+    const section = card.querySelector('.cite-path') ? card.querySelector('.cite-path').textContent.split('—')[1]?.trim() : null;
+    if (file) {
+      $('runbook-viewer-body').innerHTML = 'Loading...';
+      try {
+        const r = await fetch('/api/runbook/' + encodeURIComponent(file));
+        if (!r.ok) throw new Error();
+        let text = await r.text();
+        let highlighted = formatText(text);
+        if (section) {
+          const regex = new RegExp(`(<h[1-6]>[^<]*${escapeHtml(section)}[^<]*</h[1-6]>)`, 'i');
+          highlighted = highlighted.replace(regex, '<mark id="rb-highlight">$1</mark>');
+        }
+        $('runbook-viewer-body').innerHTML = highlighted;
+        const mark = document.getElementById('rb-highlight');
+        if (mark) mark.scrollIntoView({behavior: 'smooth', block: 'start'});
+      } catch(err) {
+        $('runbook-viewer-body').innerHTML = 'Failed to load runbook.';
+      }
+    }
+  }
+});
+
+setInterval(async () => {
+  try {
+    const r = await fetch('/api/system_metrics');
+    if (r.ok) {
+      const m = await r.json();
+      $('sys-cpu-val').textContent = m.cpu_percent + '%';
+      $('sys-cpu').style.width = m.cpu_percent + '%';
+      $('sys-ram-val').textContent = m.ram_used_gb + ' / ' + m.ram_total_gb + ' GB';
+      $('sys-ram').style.width = (m.ram_used_gb / m.ram_total_gb * 100) + '%';
+      $('sys-disk-val').textContent = m.disk_used_gb + ' / ' + m.disk_total_gb + ' GB';
+      $('sys-disk').style.width = (m.disk_used_gb / m.disk_total_gb * 100) + '%';
+    }
+  } catch(e) {}
+}, 5000);
+
+$('btn-shell').addEventListener('click', () => {
+  const panel = $('shell-panel');
+  if (panel.classList.contains('active')) {
+    panel.classList.remove('active');
+    if (shellWs) { shellWs.close(); shellWs = null; }
+  } else {
+    panel.classList.add('active');
+    shellWs = new WebSocket('ws://127.0.0.1:8000/ws/shell');
+    shellWs.onmessage = e => {
+      const out = $('shell-output');
+      out.textContent += e.data + '\n';
+      out.scrollTop = out.scrollHeight;
+    };
+  }
+});
+$('shell-close').addEventListener('click', () => {
+  $('shell-panel').classList.remove('active');
+  if (shellWs) { shellWs.close(); shellWs = null; }
+});
+$('shell-send-btn').addEventListener('click', () => {
+  const inp = $('shell-input');
+  if (inp.value && shellWs) {
+    shellWs.send(inp.value);
+    inp.value = '';
+  }
+});
+$('shell-analyze-btn').addEventListener('click', () => {
+  const lines = $('shell-output').textContent.split('\n');
+  shellContext = lines.slice(-50).join('\n');
+  showToast('Shell output queued for next query!', 'info');
+});
+
 </script>
 </body>
 </html>

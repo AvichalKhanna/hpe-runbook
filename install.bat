@@ -93,7 +93,7 @@ goto :FAIL
 :MODELS_OK
 :: 10. Post-install self-check
 echo [INFO] Running post-installation self-checks...
-python -c "import faiss, rank_bm25, fastapi, transformers, yaml, psutil; print('[OK] Core libraries imported.')"
+python -c "import faiss, rank_bm25, fastapi, transformers, yaml, psutil, duckduckgo_search, trafilatura, websockets; print('[OK] Core libraries imported.')"
 if %errorlevel% neq 0 goto :CHECKS_FAIL
 goto :CHECKS_OK
 

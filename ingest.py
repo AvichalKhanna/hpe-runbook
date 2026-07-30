@@ -27,6 +27,7 @@ if str(BASE_DIR) not in sys.path:
 
 from config import settings                          # noqa: E402
 from pipeline.indexer import build_full_index, save_state  # noqa: E402
+from pipeline.abbrev_miner import update_abbreviations  # noqa: E402
 
 
 def main() -> None:
@@ -73,6 +74,12 @@ def main() -> None:
         sys.exit(1)
 
     save_state(chunks, faiss_index, bm25)
+
+    # Auto-mine new abbreviations from runbooks
+    try:
+        update_abbreviations(runbooks_dir)
+    except Exception as exc:
+        print(f"[ingest] Warning: abbreviation mining failed (non-fatal): {exc}")
 
     elapsed = time.time() - t0
     files_indexed = len(set(c["file"] for c in chunks))
