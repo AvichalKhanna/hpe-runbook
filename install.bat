@@ -53,10 +53,32 @@ echo [ERROR] Failed to activate virtual environment.
 goto :FAIL
 
 :ACTIVATE_OK
-:: 6. Upgrade pip and install requirements
-echo [INFO] Installing requirements this may take a few minutes...
+:: 6. Upgrade pip and install build tools
+echo [INFO] Upgrading pip, setuptools and wheel...
 python -m pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt --prefer-binary
+if %errorlevel% neq 0 goto :PIP_FAIL
+
+:: 6a. Install llama-cpp-python (CPU-only pre-built binary, no C++ compiler needed)
+:: --only-binary :all: forces pip to NEVER build from source. If no pre-built wheel
+:: exists for the current Python version, it will try the fallback index instead.
+echo [INFO] Installing llama-cpp-python (CPU binary)...
+pip install llama-cpp-python --only-binary :all: --prefer-binary --quiet
+if %errorlevel% neq 0 (
+    echo [WARNING] Standard binary not found. Trying fallback CPU wheel index...
+    pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --only-binary :all: --prefer-binary --quiet
+)
+if %errorlevel% neq 0 (
+    echo [ERROR] Could not install llama-cpp-python.
+    echo [INFO]  Try installing Visual Studio Build Tools from:
+    echo [INFO]  https://visualstudio.microsoft.com/visual-cpp-build-tools/
+    echo [INFO]  Then re-run this installer.
+    goto :FAIL
+)
+echo [OK] llama-cpp-python installed.
+
+:: 6b. Install all other requirements (excluding llama-cpp-python to avoid recompile)
+echo [INFO] Installing remaining requirements...
+pip install -r requirements.txt --prefer-binary --ignore-installed llama-cpp-python --quiet
 if %errorlevel% neq 0 goto :PIP_FAIL
 goto :PIP_OK
 

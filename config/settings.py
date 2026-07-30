@@ -46,7 +46,7 @@ DEDUP_SIM_THRESHOLD      = float(os.getenv("DEDUP_SIM_THRESHOLD", "0.92"))
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
 N_CTX          = int(os.getenv("N_CTX", "8192"))
-N_GPU_LAYERS   = int(os.getenv("N_GPU_LAYERS", "-1"))
+N_GPU_LAYERS   = int(os.getenv("N_GPU_LAYERS", "0"))   # 0 = CPU-only; set to 99 for GPU/Vulkan builds
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "512"))
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
 LLM_TOP_P       = float(os.getenv("LLM_TOP_P", "0.9"))
@@ -64,3 +64,6 @@ EMBED_BATCH_SIZE  = int(os.getenv("EMBED_BATCH_SIZE", "32"))
 EMBED_MAX_LENGTH  = int(os.getenv("EMBED_MAX_LENGTH", "256"))
 
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
+
+# ── Groq / Speech Mode ───────────────────────────────────────────────────────
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")

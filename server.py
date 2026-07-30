@@ -38,6 +38,8 @@ import subprocess
 import threading
 import time
 import uuid
+import base64
+import requests
 import webbrowser
 from datetime import datetime, timezone
 from pathlib import Path
@@ -67,7 +69,7 @@ from pipeline.normalizer import normalize                        # noqa: E402
 from pipeline.retriever import HybridRetriever                   # noqa: E402
 from pipeline.reranker import rerank, get_reranker               # noqa: E402
 from pipeline.compressor import compress_chunks                  # noqa: E402
-from pipeline.prompt_builder import build_prompt                 # noqa: E402
+from pipeline.prompt_builder import build_prompt, build_interactive_prompt                 # noqa: E402
 from pipeline.abbrev_miner import update_from_text               # noqa: E402
 from pipeline import cache as query_cache                        # noqa: E402
 from observability.logger import (                               # noqa: E402
@@ -556,7 +558,80 @@ in the indexed runbooks. The information below was gathered from public web sour
 
 
 # ---------------------------------------------------------------------------
-# Main query endpoint (updated with multi-turn, conflict, near-misses)
+# Speech Interaction Endpoint
+# ---------------------------------------------------------------------------
+
+from fastapi import Form
+@app.post("/api/speech_interact")
+async def speech_interact(
+    audio: UploadFile = File(...),
+    history: str = Form(default="[]")
+):
+    if not settings.GROQ_API_KEY:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY is not configured.")
+
+    audio_bytes = await audio.read()
+    
+    # 1. Transcription (Whisper) via Groq
+    headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}"}
+    files = {"file": (audio.filename or "audio.webm", audio_bytes, audio.content_type or "audio/webm")}
+    data = {"model": "whisper-large-v3"}
+    
+    stt_resp = requests.post("https://api.groq.com/openai/v1/audio/transcriptions", headers=headers, files=files, data=data)
+    if not stt_resp.ok:
+        raise HTTPException(status_code=500, detail=f"STT Error: {stt_resp.text}")
+    
+    user_text = stt_resp.json().get("text", "").strip()
+    if not user_text:
+        return JSONResponse({"user_text": "", "assistant_text": "I didn't catch that.", "audio_base64": ""})
+
+    # 2. RAG Retrieval & Prompting
+    q_normalized = normalize(user_text)
+    try:
+        candidates, _, _ = state.retriever.retrieve(q_normalized)
+        if len(candidates) > 8:
+            candidates = candidates[:8]
+    except Exception as e:
+        candidates = []
+
+    try:
+        conv_hist = json.loads(history)
+    except Exception:
+        conv_hist = []
+
+    prompt = build_interactive_prompt(user_text, candidates, conv_hist)
+
+    # 3. LLM Generation (Local Qwen2.5-3B)
+    resp = state.llm(
+        prompt,
+        max_tokens=200, # Keep it short for speech
+        temperature=0.2,
+        stop=["<|im_end|>", "User:", "<|im_start|>"],
+    )
+    assistant_text = resp["choices"][0]["text"].strip()
+
+    # 4. Text-to-Speech (Orpheus) via Groq
+    tts_data = {
+        "model": "canopylabs/orpheus-v1-english",
+        "input": assistant_text,
+        "voice": "orpheus",
+        "response_format": "mp3"
+    }
+    tts_headers = {"Authorization": f"Bearer {settings.GROQ_API_KEY}", "Content-Type": "application/json"}
+    tts_resp = requests.post("https://api.groq.com/openai/v1/audio/speech", headers=tts_headers, json=tts_data)
+    
+    audio_base64 = ""
+    if tts_resp.ok:
+        audio_base64 = base64.b64encode(tts_resp.content).decode("utf-8")
+    else:
+        print(f"[Speech Mode] TTS Error: {tts_resp.text}")
+
+    return JSONResponse({
+        "user_text": user_text,
+        "assistant_text": assistant_text,
+        "audio_base64": audio_base64
+    })
+
 # ---------------------------------------------------------------------------
 
 @app.post("/api/query")
