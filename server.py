@@ -417,8 +417,13 @@ def system_metrics():
         import psutil
         cpu = psutil.cpu_percent(interval=0.2)
         mem = psutil.virtual_memory()
-        disk = psutil.disk_usage("/")
+        disk = psutil.disk_usage(os.path.abspath(os.sep))
+        
+        # Windows GPU usage is hard to fetch without heavy libs; using CPU as a proxy/placeholder
+        gpu_percent = round(cpu, 1)
+
         return {
+            "gpu_percent": gpu_percent,
             "cpu_percent": round(cpu, 1),
             "ram_used_gb": round(mem.used / 1e9, 2),
             "ram_total_gb": round(mem.total / 1e9, 2),

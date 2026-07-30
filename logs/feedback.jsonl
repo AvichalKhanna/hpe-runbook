@@ -1,1 +1,2 @@
 {"ts": "2026-07-30T11:34:19.304533+00:00", "request_id": "156b14b1", "query": "a kubernetes pod is stuck crash-looping", "rating": 1, "comment": ""}
+{"ts": "2026-07-30T15:48:45.328998+00:00", "request_id": "644a5942", "query": "CPU utilization is pegged at 100%", "rating": 1, "comment": ""}

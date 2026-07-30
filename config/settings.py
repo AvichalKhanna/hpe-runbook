@@ -37,7 +37,7 @@ TOP_K_RRF        = int(os.getenv("TOP_K_RRF",   "30"))
 TOP_K_FINAL_MIN  = int(os.getenv("TOP_K_FINAL_MIN", "3"))
 TOP_K_FINAL_MAX  = int(os.getenv("TOP_K_FINAL_MAX", "8"))
 RRF_K            = int(os.getenv("RRF_K", "60"))
-CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.32"))
+CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.20"))
 
 # ── Reranker ─────────────────────────────────────────────────────────────────
 RERANKER_HIGH_THRESHOLD  = float(os.getenv("RERANKER_HIGH_THRESHOLD", "0.7"))

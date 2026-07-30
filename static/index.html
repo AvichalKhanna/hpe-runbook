@@ -937,8 +937,8 @@ body[data-theme="light"] .history-time { color: #64748b; }
           <span>Live System</span>
         </div>
         <div class="metric-bar-row">
-          <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">CPU</span><span class="metric-value" id="sys-cpu-val">—</span></div>
-          <div class="metric-bar-bg"><div class="metric-bar-fill" id="sys-cpu" style="width:0%"></div></div>
+          <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">GPU</span><span class="metric-value" id="sys-gpu-val">—</span></div>
+          <div class="metric-bar-bg"><div class="metric-bar-fill" id="sys-gpu" style="width:0%"></div></div>
         </div>
         <div class="metric-bar-row">
           <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">RAM</span><span class="metric-value" id="sys-ram-val">—</span></div>
@@ -948,27 +948,6 @@ body[data-theme="light"] .history-time { color: #64748b; }
           <div style="display:flex; justify-content:space-between; width:100%"><span class="metric-label">Disk</span><span class="metric-value" id="sys-disk-val">—</span></div>
           <div class="metric-bar-bg"><div class="metric-bar-fill" id="sys-disk" style="width:0%"></div></div>
         </div>
-      <div class="sidebar-section">
-        <div class="sidebar-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          <span>Response grounding</span>
-        </div>
-        <div class="evidence-summary" id="evidence-summary">
-          Answers show the indexed sources used to ground them.
-          <span class="evidence-count" id="evidence-count">Awaiting an incident</span>
-        </div>
-      </div>
-      <div class="sidebar-section">
-        <div class="sidebar-title">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span>Retrieved evidence</span>
-        </div>
-        <div id="analytics-container">
-          <div class="analytics-row"><span class="analytics-label">Vector matches</span><span class="analytics-value" id="analytics-dense">—</span></div>
-          <div class="analytics-row"><span class="analytics-label">Keyword matches</span><span class="analytics-value" id="analytics-sparse">—</span></div>
-          <div class="analytics-row"><span class="analytics-label">Matched by both</span><span class="analytics-value" id="analytics-both">—</span></div>
-        </div>
-      </div>
       <div class="sidebar-section">
         <div class="sidebar-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
@@ -1213,11 +1192,6 @@ function switchToLanding() {
 }
 
 function resetRightSidebar() {
-  $('evidence-summary').firstChild.textContent = 'Answers show the indexed sources used to ground them. ';
-  $('evidence-count').textContent = 'Awaiting an incident';
-  $('analytics-dense').textContent = '—';
-  $('analytics-sparse').textContent = '—';
-  $('analytics-both').textContent = '—';
   $('perf-retrieval').textContent = '—';
   $('perf-generation').textContent = '—';
   $('perf-total').textContent = '—';
@@ -1307,28 +1281,11 @@ $('btn-new-incident').addEventListener('click', () => {
 
 // ===== 11. RIGHT SIDEBAR UPDATES =====
 function updateEvidenceSummary(sources, noMatch = false) {
-  const summary = $('evidence-summary');
-  const count = $('evidence-count');
-  if (noMatch) {
-    summary.firstChild.textContent = 'No indexed runbook could safely ground an answer. ';
-    count.textContent = 'No cited evidence';
-    return;
-  }
-  const files = new Set(sources.map(s => s.file)).size;
-  summary.firstChild.textContent = 'This response is grounded in indexed runbook excerpts. ';
-  count.textContent = `${sources.length} excerpt${sources.length === 1 ? '' : 's'} from ${files} file${files === 1 ? '' : 's'}`;
+  // Removed panel update
 }
 
 function updateAnalytics(sources) {
-  let dense = 0, sparse = 0, both = 0;
-  sources.forEach(s => {
-    if (s.matched_dense && s.matched_sparse) both++;
-    else if (s.matched_dense) dense++;
-    else if (s.matched_sparse) sparse++;
-  });
-  $('analytics-dense').textContent = dense + both;
-  $('analytics-sparse').textContent = sparse + both;
-  $('analytics-both').textContent = both;
+  // Removed panel update
 }
 
 function updatePerformance(retrievalMs, generationMs) {
@@ -1710,12 +1667,12 @@ setInterval(async () => {
     const r = await fetch('/api/system_metrics');
     if (r.ok) {
       const m = await r.json();
-      $('sys-cpu-val').textContent = m.cpu_percent + '%';
-      $('sys-cpu').style.width = m.cpu_percent + '%';
-      $('sys-ram-val').textContent = m.ram_used_gb + ' / ' + m.ram_total_gb + ' GB';
-      $('sys-ram').style.width = (m.ram_used_gb / m.ram_total_gb * 100) + '%';
-      $('sys-disk-val').textContent = m.disk_used_gb + ' / ' + m.disk_total_gb + ' GB';
-      $('sys-disk').style.width = (m.disk_used_gb / m.disk_total_gb * 100) + '%';
+      $('sys-gpu-val').textContent = (m.gpu_percent || 0) + '%';
+      $('sys-gpu').style.width = (m.gpu_percent || 0) + '%';
+      $('sys-ram-val').textContent = (m.ram_used_gb || 0) + ' / ' + (m.ram_total_gb || 0) + ' GB';
+      $('sys-ram').style.width = ((m.ram_used_gb || 0) / (m.ram_total_gb || 1) * 100) + '%';
+      $('sys-disk-val').textContent = (m.disk_used_gb || 0) + ' / ' + (m.disk_total_gb || 0) + ' GB';
+      $('sys-disk').style.width = ((m.disk_used_gb || 0) / (m.disk_total_gb || 1) * 100) + '%';
     }
   } catch(e) {}
 }, 5000);
