@@ -255,6 +255,7 @@ class QueryRequest(BaseModel):
     metadata_filter: dict | None = None
     conversation_history: list | None = None   # multi-turn: [{role, content}, …]
     shell_context: str | None = None           # last N lines from the shell panel
+    mode: str = "descriptive"                  # "descriptive" or "stepwise"
 
 
 class FeedbackRequest(BaseModel):
@@ -674,6 +675,7 @@ def query(req: QueryRequest):
                     q_normalized,
                     compressed,
                     conversation_history=req.conversation_history,
+                    mode=req.mode,
                 )
                 if not req.conversation_history:
                     query_cache.set_prompt(ck, prompt)

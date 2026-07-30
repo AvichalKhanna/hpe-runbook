@@ -7,20 +7,33 @@ Never fabricate commands, thresholds, contacts, file paths, or error codes.
 Use numbered steps for remediation procedures.
 Be concise."""
 
+STEPWISE_SYSTEM_PROMPT = """You are an SRE assistant providing STEP-BY-STEP remediation guidance.
+Answer ONLY from the provided [Source N] runbook excerpts.
+CRITICAL INSTRUCTION: Output EXACTLY ONE step at a time.
+Wait for the user's feedback after each step before providing the next one.
+If the user reports an error, recalibrate and provide the corrected next step.
+If the excerpts lack sufficient evidence to continue, state exactly: "Insufficient evidence to proceed. Escalate."
+Keep your response to a single step."""
 
-def build_prompt(query: str, sources: List[dict], conversation_history: list | None = None) -> str:
+def build_prompt(query: str, sources: List[dict], conversation_history: list | None = None, mode: str = "descriptive") -> str:
     """
     Build the full prompt for the LLM.
 
     conversation_history: list of {"role": "user"|"assistant", "content": str}
       representing prior turns in the current session. Injected before the
       current query so the model can answer follow-up questions coherently.
+    mode: "descriptive" (default) or "stepwise" for step-by-step output.
     """
-    prompt = f"<|im_start|>system\n{SYSTEM_PROMPT}<|im_end|>\n"
+    if mode == "stepwise":
+        sys_prompt = STEPWISE_SYSTEM_PROMPT
+    else:
+        sys_prompt = SYSTEM_PROMPT
+
+    prompt = f"<|im_start|>system\n{sys_prompt}<|im_end|>\n"
 
     # ── Multi-turn history ───────────────────────────────────────────────────
     if conversation_history:
-        for turn in conversation_history[-2:]:   # keep last 2 turns max to stay inside context & reduce latency
+        for turn in conversation_history[-3:]:   # keep last 3 turns for stepwise context
             role = turn.get("role", "user")
             content = turn.get("content", "").strip()
             if role == "user":
@@ -39,5 +52,5 @@ def build_prompt(query: str, sources: List[dict], conversation_history: list | N
         )
         prompt += f"{src.get('text', '')}\n\n"
 
-    prompt += f"On-call engineer's question: {query}<|im_end|>\n<|im_start|>assistant\n"
+    prompt += f"On-call engineer's question (provide ONLY the immediate next step if in stepwise mode): {query}<|im_end|>\n<|im_start|>assistant\n"
     return prompt
