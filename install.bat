@@ -56,7 +56,7 @@ goto :FAIL
 :: 6. Upgrade pip and install requirements
 echo [INFO] Installing requirements this may take a few minutes...
 python -m pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt
+pip install -r requirements.txt --prefer-binary
 if %errorlevel% neq 0 goto :PIP_FAIL
 goto :PIP_OK
 
