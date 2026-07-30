@@ -19,8 +19,7 @@ numpy
 # No extra package needed -- bge-reranker-base loads via transformers
 
 # --- Local LLM (Qwen2.5-3B-Instruct GGUF) ---
-# NOTE: llama-cpp-python is installed separately by install.bat using --only-binary
-# to avoid needing a C++ compiler. Do NOT add it back here.
+llama-cpp-python
 huggingface_hub
 
 # --- Observability ---
@@ -33,7 +32,6 @@ trafilatura
 # --- Utilities ---
 PyYAML
 websockets
-requests
 
 # Notes:
 # 1. llama-cpp-python on Windows: plain pip gives CPU-only build.

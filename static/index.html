@@ -917,9 +917,6 @@ body[data-theme="light"] .history-time { color: #64748b; }
           <button class="prompt-action upload-action" id="upload-btn-ws" title="Upload Runbook" aria-label="Upload runbook file">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
           </button>
-          <button class="prompt-action speech-action" id="speech-btn-ws" title="Interactive Speech Mode" aria-label="Speech Mode">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="22"></line><line x1="8" y1="22" x2="16" y2="22"></line></svg>
-          </button>
           <input type="file" id="file-input-ws" accept=".md,.pdf,.docx" style="display:none" aria-hidden="true">
           <textarea id="input-ws" rows="1" placeholder="Ask a follow-up question…" aria-label="Follow-up question"></textarea>
           <button class="diagnose-btn" id="send-btn-ws" aria-label="Send follow-up question">
@@ -1518,7 +1515,7 @@ async function sendQuery(inputEl) {
             });
             nearMissHtml += `</div>`;
           }
-          textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">NO SAFE RUNBOOK MATCH</span>${escapeHtml(payload.message)}${nearMissHtml}</div>`;
+          textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">NO SAFE RUNBOOK MATCH</span>${escapeHtml(payload.message)}<button class="patch-gap-btn" id="patch-gap-btn-${currentIncidentId}">🔍 Search Web & Patch Gap</button>${nearMissHtml}</div>`;
           updateEvidenceSummary([], true);
           updatePerformance(retrievalMs, 0);
           updateSourcesList([]);
@@ -1747,117 +1744,13 @@ $('shell-send-btn').addEventListener('click', () => {
   if (inp.value && shellWs) {
     shellWs.send(inp.value);
     inp.value = '';
+  }
+});
 $('shell-analyze-btn').addEventListener('click', () => {
   const lines = $('shell-output').textContent.split('\n');
   shellContext = lines.slice(-50).join('\n');
   showToast('Shell output queued for next query!', 'info');
 });
-
-/* =========================================================================
-   SPEECH MODE (Web Audio API & MediaRecorder)
-   ========================================================================= */
-let mediaRecorder = null;
-let audioChunks = [];
-let isSpeechMode = false;
-
-const speechBtn = $('speech-btn-ws');
-
-async function toggleSpeechMode() {
-  if (isSpeechMode) {
-    stopRecording();
-  } else {
-    await startRecording();
-  }
-}
-
-async function startRecording() {
-  try {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaRecorder = new MediaRecorder(stream);
-    
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) audioChunks.push(event.data);
-    };
-
-    mediaRecorder.onstop = async () => {
-      speechBtn.style.color = '';
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      audioChunks = [];
-      await sendSpeechQuery(audioBlob);
-    };
-
-    mediaRecorder.start();
-    isSpeechMode = true;
-    speechBtn.style.color = 'red';
-    $('input-ws').placeholder = 'Listening... (Click mic to stop)';
-  } catch (err) {
-    alert("Microphone access denied or unavailable.");
-  }
-}
-
-function stopRecording() {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
-    mediaRecorder.stop();
-    isSpeechMode = false;
-    $('input-ws').placeholder = 'Ask a follow-up question...';
-  }
-}
-
-async function sendSpeechQuery(blob) {
-  const centerContent = $('center-content');
-  
-  // Show listening/processing state
-  const loadingDiv = document.createElement('div');
-  loadingDiv.className = 'message ai-message loading';
-  loadingDiv.innerHTML = '<div class="avatar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div><div class="message-content"><div class="typing-indicator"><span></span><span></span><span></span></div></div>';
-  centerContent.appendChild(loadingDiv);
-  centerScroll.scrollTop = centerScroll.scrollHeight;
-
-  const formData = new FormData();
-  formData.append('audio', blob, 'audio.webm');
-  formData.append('history', JSON.stringify(conversationHistory));
-
-  try {
-    const res = await fetch('/api/speech_interact', {
-      method: 'POST',
-      body: formData
-    });
-    
-    if (!res.ok) throw new Error("Speech API Error");
-    
-    const data = await res.json();
-    loadingDiv.remove();
-    
-    // Add User Message to UI
-    if (data.user_text) {
-      appendUserMessage(data.user_text);
-      conversationHistory.push({ role: 'user', content: data.user_text });
-    }
-    
-    // Add Assistant Message to UI
-    appendAiMessage(data.assistant_text, [], false);
-    conversationHistory.push({ role: 'assistant', content: data.assistant_text });
-    saveHistory();
-    
-    // Play Audio
-    if (data.audio_base64) {
-      const audioUrl = "data:audio/mp3;base64," + data.audio_base64;
-      const audio = new Audio(audioUrl);
-      audio.onended = () => {
-        // Automatically start listening again for true interactive flow
-        startRecording();
-      };
-      audio.play();
-    }
-  } catch (e) {
-    loadingDiv.remove();
-    appendAiMessage("Sorry, the speech backend encountered an error: " + e.message, [], false);
-  }
-}
-
-if (speechBtn) {
-  speechBtn.addEventListener('click', toggleSpeechMode);
-}
 
 </script>
 </body>
