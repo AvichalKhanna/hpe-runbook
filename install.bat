@@ -53,10 +53,31 @@ echo [ERROR] Failed to activate virtual environment.
 goto :FAIL
 
 :ACTIVATE_OK
-:: 6. Upgrade pip and install requirements
-echo [INFO] Installing requirements this may take a few minutes...
-python -m pip install --upgrade pip setuptools wheel
-pip install -r requirements.txt --prefer-binary
+:: 6. Upgrade pip and install build tools
+echo [INFO] Upgrading pip, setuptools and wheel...
+python -m pip install --upgrade pip setuptools wheel cmake
+if %errorlevel% neq 0 goto :PIP_FAIL
+
+:: 6a. Install llama-cpp-python (Pre-built binaries, NO C++ compiler needed)
+:: --only-binary :all: forces pip to NEVER build from source.
+echo [INFO] Installing llama-cpp-python...
+echo [INFO] Trying GPU (Vulkan) version first for maximum speed...
+pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/vulkan --only-binary :all: --prefer-binary --quiet
+if %errorlevel% neq 0 (
+    echo [WARNING] Vulkan GPU binary not found for your Python version.
+    echo [INFO] Falling back to standard CPU binary...
+    pip install llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu --only-binary :all: --prefer-binary --quiet
+)
+if %errorlevel% neq 0 (
+    echo [ERROR] Could not install llama-cpp-python binaries.
+    echo [INFO] Please ensure you are running Python 3.9, 3.10, or 3.11.
+    goto :FAIL
+)
+echo [OK] llama-cpp-python installed successfully without compilation.
+
+:: 6b. Install all other requirements
+echo [INFO] Installing remaining requirements...
+pip install -r requirements.txt --prefer-binary --ignore-installed llama-cpp-python --quiet
 if %errorlevel% neq 0 goto :PIP_FAIL
 goto :PIP_OK
 
