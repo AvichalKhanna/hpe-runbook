@@ -103,6 +103,9 @@ goto :FAIL
 
 :CHECKS_OK
 echo.
+echo [INFO] Checking GPU / Hardware Acceleration support...
+python check_gpu.py
+echo.
 echo ========================================================
 echo   INSTALLATION COMPLETE - ALL SYSTEMS GO
 echo ========================================================
