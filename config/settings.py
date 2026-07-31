@@ -33,9 +33,9 @@ CHUNK_OVERLAP_WORDS = int(os.getenv("CHUNK_OVERLAP_WORDS", "40"))
 # ── Retrieval ─────────────────────────────────────────────────────────────────
 TOP_K_DENSE      = int(os.getenv("TOP_K_DENSE",  "25"))  # Enough candidates for good recall
 TOP_K_SPARSE     = int(os.getenv("TOP_K_SPARSE", "25"))  # Match dense for balanced hybrid
-TOP_K_RRF        = int(os.getenv("TOP_K_RRF",   "20"))   # RRF pool size
+TOP_K_RRF        = int(os.getenv("TOP_K_RRF",   "20"))   # From 20 RRF pool size
 TOP_K_FINAL_MIN  = int(os.getenv("TOP_K_FINAL_MIN", "3"))  # Always keep at least 3 chunks
-TOP_K_FINAL_MAX  = int(os.getenv("TOP_K_FINAL_MAX", "6"))  # Max chunks sent to LLM
+TOP_K_FINAL_MAX  = int(os.getenv("TOP_K_FINAL_MAX", "6"))  # Max chunks sent to LLM now changed to 3 from 6
 RRF_K            = int(os.getenv("RRF_K", "60"))
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.15"))  # Lower = fewer false negatives
 
@@ -45,8 +45,8 @@ RERANKER_LOW_THRESHOLD   = float(os.getenv("RERANKER_LOW_THRESHOLD",  "0.35"))
 DEDUP_SIM_THRESHOLD      = float(os.getenv("DEDUP_SIM_THRESHOLD", "0.92"))
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
-N_CTX          = int(os.getenv("N_CTX", "4096"))  # Enough for sources + history without truncation
-N_GPU_LAYERS   = int(os.getenv("N_GPU_LAYERS", "0"))
+N_CTX          = int(os.getenv("N_CTX", "8192"))  # Enough for sources + history without truncation
+N_GPU_LAYERS   = int(os.getenv("N_GPU_LAYERS", "-1"))
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "256"))  # Reduced from 512 for speed
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
 LLM_TOP_P       = float(os.getenv("LLM_TOP_P", "0.9"))

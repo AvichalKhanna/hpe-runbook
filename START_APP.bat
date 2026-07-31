@@ -16,7 +16,8 @@ echo [ERROR] Virtual environment not found.
 echo Please run INSTALL.bat first.
 goto :FAIL
 :VENV_OK
-call venv\Scripts\activate.bat
+:: call venv\Scripts\activate.bat
+:: NOT USING THE VENV TO AVOID ISSUE WITH VULKAN BUILD
 
 :: 3. Verify required models
 if exist "models\MiniLM-L6-v2\model.safetensors" goto :EMBED_OK

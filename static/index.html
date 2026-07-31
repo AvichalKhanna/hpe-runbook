@@ -1362,9 +1362,9 @@ function updateAnalytics(sources) {
 }
 
 function updatePerformance(retrievalMs, generationMs) {
-  $('perf-retrieval').textContent = retrievalMs ? retrievalMs + 'ms' : '—';
-  $('perf-generation').textContent = generationMs ? generationMs + 'ms' : '—';
-  $('perf-total').textContent = (retrievalMs || generationMs) ? (retrievalMs + generationMs) + 'ms' : '—';
+  $('perf-retrieval').textContent = retrievalMs ? (retrievalMs / 1000).toFixed(2) + 's' : '—';
+  $('perf-generation').textContent = generationMs ? (generationMs / 1000).toFixed(2) + 's' : '—';
+  $('perf-total').textContent = (retrievalMs || generationMs) ? ((retrievalMs + generationMs) / 1000).toFixed(2) + 's' : '—';
 }
 
 function updateSourcesList(sources) {
@@ -1620,7 +1620,7 @@ async function sendQuery(inputEl, retryCount = 0) {
     // Performance footer card
     const perfCard = document.createElement('div');
     perfCard.className = 'card perf-card-inline';
-    perfCard.innerHTML = `<span class="perf-item">⚡ Retrieved in ${retrievalMs}ms</span>${generationMs ? `<span class="perf-divider">·</span><span class="perf-item">Generated in ${generationMs}ms</span>` : ''}`;
+    perfCard.innerHTML = `<span class="perf-item">⚡ Retrieved in ${(retrievalMs/1000).toFixed(2)}s</span>${generationMs ? `<span class="perf-divider">·</span><span class="perf-item">Generated in ${(generationMs/1000).toFixed(2)}s</span>` : ''}`;
     group.appendChild(perfCard);
     updatePerformance(retrievalMs, generationMs);
 
