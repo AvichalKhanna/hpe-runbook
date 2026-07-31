@@ -31,11 +31,11 @@ CHUNK_MAX_WORDS     = int(os.getenv("CHUNK_MAX_WORDS", "180"))
 CHUNK_OVERLAP_WORDS = int(os.getenv("CHUNK_OVERLAP_WORDS", "40"))
 
 # ── Retrieval ─────────────────────────────────────────────────────────────────
-TOP_K_DENSE      = int(os.getenv("TOP_K_DENSE",  "25"))  # Enough candidates for good recall
-TOP_K_SPARSE     = int(os.getenv("TOP_K_SPARSE", "25"))  # Match dense for balanced hybrid
-TOP_K_RRF        = int(os.getenv("TOP_K_RRF",   "20"))   # From 20 RRF pool size
-TOP_K_FINAL_MIN  = int(os.getenv("TOP_K_FINAL_MIN", "3"))  # Always keep at least 3 chunks
-TOP_K_FINAL_MAX  = int(os.getenv("TOP_K_FINAL_MAX", "6"))  # Max chunks sent to LLM now changed to 3 from 6
+TOP_K_DENSE      = int(os.getenv("TOP_K_DENSE",  "40"))
+TOP_K_SPARSE     = int(os.getenv("TOP_K_SPARSE", "40"))
+TOP_K_RRF        = int(os.getenv("TOP_K_RRF",   "25"))
+TOP_K_FINAL_MIN  = int(os.getenv("TOP_K_FINAL_MIN", "3"))
+TOP_K_FINAL_MAX  = int(os.getenv("TOP_K_FINAL_MAX", "8"))
 RRF_K            = int(os.getenv("RRF_K", "60"))
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.15"))  # Lower = fewer false negatives
 
