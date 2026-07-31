@@ -1502,7 +1502,7 @@ async function sendQuery(inputEl, retryCount = 0) {
   const textEl = responseCard.querySelector('.response-content');
   let rawText = '';
   let sources = [];
-  let retrievalMs = 0, generationMs = 0;
+  let retrievalMs = 0, generationMs = 0, ttftMs = 0;
 
   try {
     const res = await fetch('/api/query', {
@@ -1532,6 +1532,9 @@ async function sendQuery(inputEl, retryCount = 0) {
 
         if (payload.type === 'ping') {
           // Keepalive — ignore
+        } else if (payload.type === 'ttft') {
+          ttftMs = payload.ttft_ms;
+          $('perf-generation').textContent = 'First word in ' + (ttftMs / 1000).toFixed(2) + 's';
         } else if (payload.type === 'no_match') {
           retrievalMs = payload.retrieval_ms;
           let nearMissHtml = '';
@@ -1620,7 +1623,7 @@ async function sendQuery(inputEl, retryCount = 0) {
     // Performance footer card
     const perfCard = document.createElement('div');
     perfCard.className = 'card perf-card-inline';
-    perfCard.innerHTML = `<span class="perf-item">⚡ Retrieved in ${(retrievalMs/1000).toFixed(2)}s</span>${generationMs ? `<span class="perf-divider">·</span><span class="perf-item">Generated in ${(generationMs/1000).toFixed(2)}s</span>` : ''}`;
+    perfCard.innerHTML = `<span class="perf-item">⚡ Retrieved in ${(retrievalMs/1000).toFixed(2)}s</span>${ttftMs ? `<span class="perf-divider">·</span><span class="perf-item">First word in ${(ttftMs/1000).toFixed(2)}s</span>` : ''}${generationMs ? `<span class="perf-divider">·</span><span class="perf-item">Finished in ${(generationMs/1000).toFixed(2)}s</span>` : ''}`;
     group.appendChild(perfCard);
     updatePerformance(retrievalMs, generationMs);
 

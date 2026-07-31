@@ -694,18 +694,24 @@ def query(req: QueryRequest):
         def _run_llm():
             """Run llama_cpp inference in a thread; push tokens into queue."""
             try:
-                stream = state.llm(
-                    prompt,
+                stream = state.llm.create_chat_completion(
+                    messages=prompt,
                     max_tokens=settings.MAX_NEW_TOKENS,
                     temperature=settings.LLM_TEMPERATURE,
                     top_p=settings.LLM_TOP_P,
                     repeat_penalty=settings.LLM_REPEAT_PENALTY,
-                    stop=["<|im_end|>", "<|im_start|>"],
                     stream=True,
                 )
+                
+                first_token = True
                 for chunk in stream:
-                    text = chunk["choices"][0]["text"]
-                    if text:
+                    delta = chunk["choices"][0]["delta"]
+                    if "content" in delta:
+                        text = delta["content"]
+                        if first_token:
+                            ttft_ms = int((time.time() - t_llm_start) * 1000)
+                            token_queue.put(("ttft", ttft_ms))
+                            first_token = False
                         token_queue.put(("token", text))
                 token_queue.put(("done", None))
             except Exception as exc:
@@ -722,6 +728,8 @@ def query(req: QueryRequest):
                 if kind == "token":
                     raw_text += val
                     yield f"data: {json.dumps({'type': 'token', 'text': val})}\n\n"
+                elif kind == "ttft":
+                    yield f"data: {json.dumps({'type': 'ttft', 'ttft_ms': val})}\n\n"
                 elif kind == "done":
                     break
                 elif kind == "error":
@@ -739,6 +747,7 @@ def query(req: QueryRequest):
         log.memory_mb = get_memory_mb()
         query_cache.set_response(ck, raw_text)
 
+        #IMPORTANT 
         yield f"data: {json.dumps({'type': 'done', 'generation_ms': generation_ms, 'request_id': request_id})}\n\n"
         log_request(log)
 
