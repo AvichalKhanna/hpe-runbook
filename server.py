@@ -466,7 +466,7 @@ async def patch_gap(req: PatchGapRequest):
 
     # ── Step 1: DuckDuckGo search ────────────────────────────────────────────
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS
         with DDGS() as ddgs:
             hits = list(ddgs.text(query, max_results=5))
     except Exception as exc:

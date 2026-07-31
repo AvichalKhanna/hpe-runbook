@@ -1,39 +1,36 @@
 from typing import List
 
-SYSTEM_PROMPT = """You are an SRE assistant. Answer ONLY from the provided [Source N] runbook excerpts.
-Cite every factual claim with [Source N].
-If excerpts lack sufficient evidence, state exactly: "Insufficient evidence in the indexed runbooks to safely answer this question." and suggest escalation.
-Never fabricate commands, thresholds, contacts, file paths, or error codes.
-Use numbered steps for remediation procedures.
-Be concise."""
+SYSTEM_PROMPT = """You are an SRE runbook assistant. Your ONLY knowledge source is the [Source N] excerpts provided below.
+Rules:
+1. Answer using ONLY information present verbatim in the excerpts. Copy exact commands, thresholds, paths, and error codes from the sources.
+2. Cite every fact with [Source N] inline.
+3. If the excerpts do not contain enough information, say exactly: "Insufficient evidence in the indexed runbooks." Do NOT guess or use general knowledge.
+4. Use numbered steps for remediation procedures.
+5. Be precise and concise."""
 
-STEPWISE_SYSTEM_PROMPT = """You are an SRE assistant providing STEP-BY-STEP remediation guidance.
-Answer ONLY from the provided [Source N] runbook excerpts.
-CRITICAL INSTRUCTION: Output EXACTLY ONE step at a time.
-Wait for the user's feedback after each step before providing the next one.
-If the user reports an error, recalibrate and provide the corrected next step.
-If the excerpts lack sufficient evidence to continue, state exactly: "Insufficient evidence to proceed. Escalate."
-Keep your response to a single step."""
+STEPWISE_SYSTEM_PROMPT = """You are an SRE runbook assistant providing STEP-BY-STEP remediation guidance.
+Your ONLY knowledge source is the [Source N] excerpts provided below.
+Rules:
+1. Output EXACTLY ONE step at a time, copied from the source excerpts.
+2. Cite the source with [Source N].
+3. After outputting the step, stop and wait for the user's confirmation or error report.
+4. If the user reports an error, recalibrate using the excerpts and provide the corrected action.
+5. If the excerpts lack evidence, say: "Insufficient evidence to proceed. Escalate."
+"""
 
 def build_prompt(query: str, sources: List[dict], conversation_history: list | None = None, mode: str = "descriptive") -> str:
     """
     Build the full prompt for the LLM.
 
     conversation_history: list of {"role": "user"|"assistant", "content": str}
-      representing prior turns in the current session. Injected before the
-      current query so the model can answer follow-up questions coherently.
-    mode: "descriptive" (default) or "stepwise" for step-by-step output.
+    mode: "descriptive" (default) or "stepwise"
     """
-    if mode == "stepwise":
-        sys_prompt = STEPWISE_SYSTEM_PROMPT
-    else:
-        sys_prompt = SYSTEM_PROMPT
-
+    sys_prompt = STEPWISE_SYSTEM_PROMPT if mode == "stepwise" else SYSTEM_PROMPT
     prompt = f"<|im_start|>system\n{sys_prompt}<|im_end|>\n"
 
     # ── Multi-turn history ───────────────────────────────────────────────────
     if conversation_history:
-        for turn in conversation_history[-3:]:   # keep last 3 turns for stepwise context
+        for turn in conversation_history[-3:]:
             role = turn.get("role", "user")
             content = turn.get("content", "").strip()
             if role == "user":
@@ -42,15 +39,17 @@ def build_prompt(query: str, sources: List[dict], conversation_history: list | N
                 prompt += f"<|im_start|>assistant\n{content}<|im_end|>\n"
 
     # ── Current turn ─────────────────────────────────────────────────────────
-    prompt += "<|im_start|>user\nRunbook excerpts:\n\n"
+    prompt += "<|im_start|>user\n"
+    prompt += "=== RUNBOOK EXCERPTS (answer only from these) ===\n\n"
 
     for i, src in enumerate(sources, 1):
         prompt += (
             f"[Source {i}] File: {src.get('file', 'unknown')} | "
             f"Section: {src.get('section', 'unknown')} | "
             f"Lines {src.get('start_line', '?')}-{src.get('end_line', '?')}\n"
+            f"---\n"
         )
-        prompt += f"{src.get('text', '')}\n\n"
+        prompt += f"{src.get('text', '').strip()}\n\n"
 
-    prompt += f"On-call engineer's question (provide ONLY the immediate next step if in stepwise mode): {query}<|im_end|>\n<|im_start|>assistant\n"
+    prompt += f"=== QUESTION ===\n{query}<|im_end|>\n<|im_start|>assistant\n"
     return prompt
