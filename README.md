@@ -37,40 +37,36 @@ Answers on-call questions like *"what do I do if the database connection pool is
 At the top level, a query moves through three stages — **ingest once, retrieve + generate on every question**:
 
 ```mermaid
-flowchart LR
-    subgraph Ingest
-        A["Runbooks (.md/.pdf/.docx/.pptx)"] --> B["ingest.py → Chunker"]
-        B --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
-    end
+flowchart TD
+    A["Runbooks (.md .pdf .docx .pptx)"]
+        --> B["ingest.py → Structure-aware Chunker"]
+        --> C["index_store (faiss.index • bm25.pkl • chunks.json)"]
 
-    subgraph Retrieval
-        Q["On-call Question"] --> D["Dense Search (FAISS)"]
-        Q --> E["Sparse Search (BM25)"]
-        C -.-> D
-        C -.-> E
-        D --> F["Rank Fusion"]
-        E --> F
-        F --> G["Rerank (bge-reranker-base)"]
-    end
+    Q["On-call Question"]
+        --> D["Dense Search (MiniLM-L6 + FAISS)"]
+    Q --> E["Sparse Search (BM25 Okapi)"]
 
-    subgraph Decision
-        G --> H{"Confident Match?"}
-        H -->|No| I["Escalate Card"]
-        H -->|Yes| J["Prompt Builder (XML-safe)"]
-    end
+    C -.-> D
+    C -.-> E
 
-    subgraph Generation
-        J --> K["LLM (Qwen2.5-3B via llama-cpp)"]
-        K --> L["Frontend (index.html + SSE)"]
-    end
+    D --> F["Reciprocal Rank Fusion (RRF)"]
+    E --> F
+    F --> G["Cross-Encoder Rerank (bge-reranker-base)"]
 
-    %% Styling
+    G --> H{"Confident Match?"}
+    H -->|No| I["Escalate Card (no hallucination)"]
+    H -->|Yes| J["Prompt Builder (XML-delimited, injection-hardened)"]
+
+    J --> K["Qwen2.5-3B-Instruct (GGUF via llama-cpp)"]
+    K --> L["Frontend (static/index.html, SSE streaming + citations)"]
+
+    %% Styling for readability
+    style A fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
     style C fill:#0d1117,stroke:#58A6FF,color:#C9D1D9
     style F fill:#0d1117,stroke:#8957E5,color:#C9D1D9
     style H fill:#0d1117,stroke:#F58025,color:#C9D1D9
     style I fill:#0d1117,stroke:#F85149,color:#C9D1D9
     style L fill:#0d1117,stroke:#2EA043,color:#C9D1D9
-
 ```
 
 The confidence gate matters more than it looks: if `CONFIDENCE_THRESHOLD` isn't cleared, the LLM is never invoked at all — the escalate card is the only possible output for that path. There's no code path where the model can answer without either a passing retrieval score or an explicit "I don't know."
