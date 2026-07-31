@@ -599,9 +599,28 @@ body {
 .metric-value { color: var(--text-primary); font-family: var(--mono); }
 .runbook-viewer { display: none; background: var(--bg-surface); border-left: 1px solid var(--border-subtle); flex-direction: column; overflow: hidden; }
 .runbook-viewer.active { display: flex; }
-.runbook-viewer-header { padding: 12px; font-weight: bold; border-bottom: 1px solid var(--border-subtle); background: var(--bg-elevated); }
-.runbook-viewer-body { padding: 16px; overflow-y: auto; flex: 1; font-size: 13px; line-height: 1.6; }
+.runbook-viewer.overlay-mode { position: fixed; top: 60px; right: 0; width: 480px; height: calc(100vh - 60px); z-index: 200; box-shadow: -4px 0 32px rgba(0,0,0,0.4); display: flex; }
+.viewer-overlay-backdrop { display: none; position: fixed; inset: 0; z-index: 199; background: rgba(0,0,0,0.3); }
+.viewer-overlay-backdrop.active { display: block; }
+.runbook-viewer-header { padding: 14px 16px 12px; font-weight: 600; border-bottom: 1px solid var(--border-subtle); background: var(--bg-elevated); display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.viewer-header-info { display: flex; flex-direction: column; gap: 4px; overflow: hidden; }
+.viewer-header-title { font-size: 13px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.viewer-header-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.viewer-meta-chip { font-size: 10px; padding: 2px 7px; border-radius: 10px; background: var(--bg-surface); border: 1px solid var(--border-subtle); color: var(--text-secondary); font-family: var(--mono); }
+.viewer-meta-chip.accent { background: rgba(77,142,255,0.12); border-color: rgba(77,142,255,0.3); color: var(--accent-blue); }
+.viewer-close-btn { flex-shrink: 0; background: none; border: none; color: var(--text-secondary); cursor: pointer; padding: 2px 4px; border-radius: 4px; line-height: 1; font-size: 16px; }
+.viewer-close-btn:hover { color: var(--text-primary); background: var(--bg-surface); }
+.runbook-viewer-body { padding: 20px 18px; overflow-y: auto; flex: 1; font-size: 13px; line-height: 1.7; }
 .runbook-viewer-body mark { background: rgba(251,191,36,0.3); color: inherit; padding: 2px 4px; border-radius: 3px; }
+.viewer-src-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--mono); color: var(--accent-blue); background: rgba(77,142,255,0.1); border: 1px solid rgba(77,142,255,0.25); border-radius: 4px; padding: 3px 9px; margin-bottom: 14px; }
+.viewer-section-divider { border: none; border-top: 1px solid var(--border-subtle); margin: 16px 0; }
+.runbook-viewer-body p { margin: 0 0 10px; }
+.runbook-viewer-body h3,
+.runbook-viewer-body h4 { margin: 14px 0 6px; font-size: 13px; color: var(--text-primary); }
+.runbook-viewer-body pre { background: var(--bg-elevated); border: 1px solid var(--border-subtle); border-radius: 5px; padding: 10px 14px; font-size: 12px; overflow-x: auto; margin: 10px 0; }
+.runbook-viewer-body ul, .runbook-viewer-body ol { padding-left: 20px; margin: 6px 0 10px; }
+.runbook-viewer-body li { margin-bottom: 4px; }
+.runbook-viewer-body code { font-family: var(--mono); font-size: 12px; background: var(--bg-elevated); padding: 1px 5px; border-radius: 3px; }
 .shell-panel { position: fixed; bottom: -400px; left: 10%; width: 80%; height: 350px; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 8px 8px 0 0; display: flex; flex-direction: column; transition: bottom 0.3s var(--ease); z-index: 1000; box-shadow: var(--shadow-lg); }
 .shell-panel.active { bottom: 0; }
 .shell-header { padding: 8px 12px; background: var(--bg-elevated); border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; font-weight: bold; }
@@ -913,9 +932,16 @@ body[data-theme="light"] .history-time { color: #64748b; }
         <div class="center-content" id="center-content"></div>
       </div>
       <div id="runbook-viewer" class="runbook-viewer">
-        <div class="runbook-viewer-header">Runbook Viewer</div>
-        <div id="runbook-viewer-body" class="runbook-viewer-body">Select a citation to view the document.</div>
+        <div class="runbook-viewer-header">
+          <div class="viewer-header-info">
+            <div class="viewer-header-title" id="viewer-title">Runbook Viewer</div>
+            <div class="viewer-header-meta" id="viewer-meta"></div>
+          </div>
+          <button class="viewer-close-btn" id="viewer-close-btn" title="Close viewer">✕</button>
+        </div>
+        <div id="runbook-viewer-body" class="runbook-viewer-body">Click any <strong>[Source N]</strong> or SRC card to view the exact excerpt here.</div>
       </div>
+      <div class="viewer-overlay-backdrop" id="viewer-backdrop"></div>
       <div class="workspace-input">
         <div class="prompt-box" id="prompt-box-ws">
           <button class="prompt-action upload-action" id="upload-btn-ws" title="Upload Runbook" aria-label="Upload runbook file">
@@ -1127,6 +1153,53 @@ window.jumpToSource = function(e, n) {
 
 function toggleCitation(el) {
   el.classList.toggle('open');
+  // Show the specific source chunk in the viewer panel
+  try {
+    const srcData = el._sourceData;
+    if (srcData) showSourceInViewer(srcData, el.dataset.id);
+  } catch(e) {}
+}
+
+function showSourceInViewer(src, srcNum) {
+  const viewer = $('runbook-viewer');
+  const backdrop = $('viewer-backdrop');
+
+  // Build header meta chips
+  const chips = [];
+  if (src.file) chips.push(`<span class="viewer-meta-chip accent">${escapeHtml(src.file)}</span>`);
+  if (src.section && src.section !== 'General') chips.push(`<span class="viewer-meta-chip">${escapeHtml(src.section)}</span>`);
+  if (src.page_number) chips.push(`<span class="viewer-meta-chip">Page ${src.page_number}</span>`);
+  if (src.start_line && src.end_line) chips.push(`<span class="viewer-meta-chip">Lines ${src.start_line}–${src.end_line}</span>`);
+  const badge = src.matched_dense && src.matched_sparse ? 'DENSE+BM25' : src.matched_dense ? 'DENSE' : 'BM25';
+  chips.push(`<span class="viewer-meta-chip">${badge}</span>`);
+  if (src.confidence != null) chips.push(`<span class="viewer-meta-chip">Score ${(src.confidence||src.rrf_score||0).toFixed(3)}</span>`);
+
+  $('viewer-title').textContent = `SRC ${String(srcNum).padStart(2,'0')} — ${src.file || 'Unknown file'}`;
+  $('viewer-meta').innerHTML = chips.join('');
+
+  // Format the chunk text
+  const body = $('runbook-viewer-body');
+  body.innerHTML =
+    `<div class="viewer-src-label">📄 Source ${srcNum} · ${escapeHtml(src.section || 'General')}</div>` +
+    `<hr class="viewer-section-divider">` +
+    formatText(src.text || '');
+
+  // Show as overlay if not in split-screen
+  if (!isSplitScreen) {
+    viewer.classList.add('overlay-mode');
+    backdrop.classList.add('active');
+  }
+  viewer.classList.add('active');
+  body.scrollTop = 0;
+}
+
+function closeViewer() {
+  const viewer = $('runbook-viewer');
+  const backdrop = $('viewer-backdrop');
+  if (!isSplitScreen) {
+    viewer.classList.remove('overlay-mode', 'active');
+  }
+  backdrop.classList.remove('active');
 }
 
 // ===== 6. TOAST NOTIFICATIONS =====
@@ -1530,13 +1603,15 @@ async function sendQuery(inputEl) {
         card.dataset.id = n;
         card.dataset.active = '1';
         card.dataset.file = s.file;
+        card._sourceData = s;  // Store full source object for viewer
+        card.title = 'Click to read this source excerpt';
         card.innerHTML = `
           <div class="cite-head">
             <span class="cite-id">SRC ${String(n).padStart(2,'0')}</span>
             <span class="cite-path">${escapeHtml(s.file)} — ${escapeHtml(s.section)}</span>
             ${conflictBadge}
             <span class="cite-badge">${badge}</span>
-            <span class="cite-lines">Pg ${s.page_number} | L${s.start_line}-${s.end_line}</span>
+            <span class="cite-lines">Pg ${s.page_number} | L${s.start_line}–${s.end_line}</span>
           </div>
           <div class="cite-snippet">${formatText(s.text)}</div>`;
         citeList.appendChild(card);
@@ -1647,31 +1722,16 @@ $('btn-split-screen').addEventListener('click', () => {
   }
 });
 
-document.addEventListener('click', async e => {
-  const card = e.target.closest('.citation-card');
-  if (card && $('center-content').contains(card) && isSplitScreen) {
-    const file = card.dataset.file;
-    const section = card.querySelector('.cite-path') ? card.querySelector('.cite-path').textContent.split('—')[1]?.trim() : null;
-    if (file) {
-      $('runbook-viewer-body').innerHTML = 'Loading...';
-      try {
-        const r = await fetch('/api/runbook/' + encodeURIComponent(file));
-        if (!r.ok) throw new Error();
-        let text = await r.text();
-        let highlighted = formatText(text);
-        if (section) {
-          const regex = new RegExp(`(<h[1-6]>[^<]*${escapeHtml(section)}[^<]*</h[1-6]>)`, 'i');
-          highlighted = highlighted.replace(regex, '<mark id="rb-highlight">$1</mark>');
-        }
-        $('runbook-viewer-body').innerHTML = highlighted;
-        const mark = document.getElementById('rb-highlight');
-        if (mark) mark.scrollIntoView({behavior: 'smooth', block: 'start'});
-      } catch(err) {
-        $('runbook-viewer-body').innerHTML = 'Failed to load runbook.';
-      }
-    }
-  }
+// Close viewer on backdrop click or close button
+document.addEventListener('DOMContentLoaded', () => {
+  $('viewer-backdrop')?.addEventListener('click', closeViewer);
+  $('viewer-close-btn')?.addEventListener('click', closeViewer);
 });
+// Also wire up immediately in case DOMContentLoaded already fired
+if (document.readyState !== 'loading') {
+  $('viewer-backdrop')?.addEventListener('click', closeViewer);
+  $('viewer-close-btn')?.addEventListener('click', closeViewer);
+}
 
 setInterval(async () => {
   try {
