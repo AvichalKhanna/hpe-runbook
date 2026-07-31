@@ -33,6 +33,7 @@ import asyncio
 import io
 import json
 import os
+import queue
 import re
 import subprocess
 import threading
@@ -685,28 +686,52 @@ def query(req: QueryRequest):
         # ── 8. SSE: sources first ─────────────────────────────────────────────
         yield f"data: {json.dumps({'type': 'sources', 'sources': reranked, 'retrieval_ms': retrieval_ms, 'request_id': request_id})}\n\n"
 
-        # ── 9. LLM generation ─────────────────────────────────────────────────
+        # ── 9. LLM generation (runs in background thread to prevent SSE timeout) ──
         raw_text = ""
         t_llm_start = time.time()
-        try:
-            stream = state.llm(
-                prompt,
-                max_tokens=settings.MAX_NEW_TOKENS,
-                temperature=settings.LLM_TEMPERATURE,
-                top_p=settings.LLM_TOP_P,
-                stop=["<|im_end|>"],
-                stream=True,
-            )
-            for chunk in stream:
-                text = chunk["choices"][0]["text"]
-                if text:
-                    raw_text += text
-                    yield f"data: {json.dumps({'type': 'token', 'text': text})}\n\n"
-        except Exception as exc:
-            print(f"[server] LLM error: {exc}")
-            err_msg = f"LLM generation failed: {exc}"
-            yield f"data: {json.dumps({'type': 'token', 'text': err_msg})}\n\n"
-            raw_text = err_msg
+        token_queue: queue.Queue = queue.Queue()
+
+        def _run_llm():
+            """Run llama_cpp inference in a thread; push tokens into queue."""
+            try:
+                stream = state.llm(
+                    prompt,
+                    max_tokens=settings.MAX_NEW_TOKENS,
+                    temperature=settings.LLM_TEMPERATURE,
+                    top_p=settings.LLM_TOP_P,
+                    repeat_penalty=settings.LLM_REPEAT_PENALTY,
+                    stop=["<|im_end|>", "<|im_start|>"],
+                    stream=True,
+                )
+                for chunk in stream:
+                    text = chunk["choices"][0]["text"]
+                    if text:
+                        token_queue.put(("token", text))
+                token_queue.put(("done", None))
+            except Exception as exc:
+                print(f"[server] LLM error: {exc}")
+                token_queue.put(("error", str(exc)))
+
+        llm_thread = threading.Thread(target=_run_llm, daemon=True)
+        llm_thread.start()
+
+        # Drain the queue, sending tokens and keepalive pings
+        while True:
+            try:
+                kind, val = token_queue.get(timeout=5.0)  # wait up to 5s per token batch
+                if kind == "token":
+                    raw_text += val
+                    yield f"data: {json.dumps({'type': 'token', 'text': val})}\n\n"
+                elif kind == "done":
+                    break
+                elif kind == "error":
+                    err_msg = f"LLM generation failed: {val}"
+                    yield f"data: {json.dumps({'type': 'token', 'text': err_msg})}\n\n"
+                    raw_text = err_msg
+                    break
+            except queue.Empty:
+                # No token in 5s — send a keepalive ping to prevent browser timeout
+                yield f"data: {json.dumps({'type': 'ping'})}\n\n"
 
         generation_ms = int((time.time() - t_llm_start) * 1000)
         log.timings_ms["llm_inference"] = generation_ms
@@ -717,7 +742,15 @@ def query(req: QueryRequest):
         yield f"data: {json.dumps({'type': 'done', 'generation_ms': generation_ms, 'request_id': request_id})}\n\n"
         log_request(log)
 
-    return StreamingResponse(event_stream(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
+            "Connection": "keep-alive",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------

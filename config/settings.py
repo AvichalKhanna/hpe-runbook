@@ -47,9 +47,10 @@ DEDUP_SIM_THRESHOLD      = float(os.getenv("DEDUP_SIM_THRESHOLD", "0.92"))
 # ── LLM ──────────────────────────────────────────────────────────────────────
 N_CTX          = int(os.getenv("N_CTX", "3072")) # Reduced from 8192 for much faster prompt evaluation
 N_GPU_LAYERS   = int(os.getenv("N_GPU_LAYERS", "0"))
-MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "512"))
+MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", "256"))  # Reduced from 512 for speed
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.2"))
 LLM_TOP_P       = float(os.getenv("LLM_TOP_P", "0.9"))
+LLM_REPEAT_PENALTY = float(os.getenv("LLM_REPEAT_PENALTY", "1.15"))  # Prevents rambling
 
 # ── Cache ─────────────────────────────────────────────────────────────────────
 CACHE_MAX_SIZE   = int(os.getenv("CACHE_MAX_SIZE", "256"))

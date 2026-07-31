@@ -1452,7 +1452,7 @@ initInput($('input'), $('send-btn'));
 initInput($('input-ws'), $('send-btn-ws'));
 
 // ===== 15. QUERY HANDLING =====
-async function sendQuery(inputEl) {
+async function sendQuery(inputEl, retryCount = 0) {
   const q = inputEl.value.trim();
   if (!q) return;
   inputEl.value = '';
@@ -1541,7 +1541,9 @@ async function sendQuery(inputEl) {
         if (!line.startsWith('data:')) continue;
         const payload = JSON.parse(line.slice(5).trim());
 
-        if (payload.type === 'no_match') {
+        if (payload.type === 'ping') {
+          // Keepalive — ignore
+        } else if (payload.type === 'no_match') {
           retrievalMs = payload.retrieval_ms;
           let nearMissHtml = '';
           if (payload.near_misses && payload.near_misses.length > 0) {
@@ -1683,7 +1685,14 @@ async function sendQuery(inputEl) {
     conversationHistory.push({ role: 'assistant', content: rawText });
 
   } catch(err) {
-    textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">CONNECTION ERROR</span>Could not reach the backend. Is server.py running? (${escapeHtml(String(err))})</div>`;
+    const isNetworkErr = err instanceof TypeError;
+    if (isNetworkErr && (retryCount || 0) < 2) {
+      // Auto-retry up to 2 times on network error
+      textEl.innerHTML = `<div class="no-match-card" style="opacity:0.7"><span class="no-match-tag">RETRYING</span>Connection dropped. Retrying in 2s… (attempt ${(retryCount||0)+1}/2)</div>`;
+      setTimeout(() => sendQuery(inputEl, retryCount ? retryCount + 1 : 1), 2000);
+      return;
+    }
+    textEl.innerHTML = `<div class="no-match-card"><span class="no-match-tag">CONNECTION ERROR</span>Could not reach the backend. Make sure the server is running, then try again.<br><small style="opacity:0.6">${escapeHtml(String(err))}</small><br><button onclick="sendQuery(document.getElementById('input-ws') || document.getElementById('input'))" style="margin-top:8px;background:var(--accent-blue);color:#fff;border:none;padding:5px 14px;border-radius:4px;cursor:pointer;font-size:12px">↩ Retry</button></div>`;
   } finally {
     const inc = incidentHistory.find(h => h.id === currentIncidentId);
     if (inc) {
